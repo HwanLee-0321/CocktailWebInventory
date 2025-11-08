@@ -1,0 +1,6 @@
+@CocktailWebApplication_HostAddress = http://localhost:5031
+
+GET {{CocktailWebApplication_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
