@@ -2,6 +2,9 @@
 using CocktailWebApplication.Services;
 using CocktailWebApplication.Models;
 using System.Text.Json;
+using System.Xml.Linq;
+using System.Diagnostics.Metrics;
+using Sprache;
 
 //    [ApiController]
 //[Route("[controller]")]
@@ -9,150 +12,114 @@ using System.Text.Json;
 [Route("api/cocktail")]
 public class CocktailController : ControllerBase
 {
-    private readonly HttpClient _httpClient;
-    private readonly Translator _translator;
+    private readonly CocktailService _cocktailService;
 
-    public CocktailController(IHttpClientFactory httpClientFactory)
+    public CocktailController(CocktailService cocktailService)
     {
-        _httpClient = httpClientFactory.CreateClient();
-        _translator = new Translator(_httpClient);
-    }
-
-    private async Task<IActionResult> GetFromApi(string url)
-    {
-        var response = await _httpClient.GetAsync(url);
-
-        if (!response.IsSuccessStatusCode)
-        {
-            return StatusCode((int)response.StatusCode, "API 요청 실패");
-        }
-
-        var json = await response.Content.ReadAsStringAsync();
-
-        if (string.IsNullOrEmpty(json))
-        {
-            return Ok(new DrinkResponse());
-        }
-
-        try
-        {
-            var options = new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            };
-
-            DrinkResponse? result = JsonSerializer.Deserialize<DrinkResponse>(json, options);
-            return Ok(result ?? new DrinkResponse());
-        }
-        catch (JsonException ex)
-        {
-            return StatusCode(500, $"역직렬화 실패: {ex.Message}");
-        }
+        _cocktailService = cocktailService;
     }
 
     [HttpGet("searchByName")]
     public async Task<IActionResult> SearchByName(string name)
     {
-        string url = $"https://www.thecocktaildb.com/api/json/v1/1/search.php?s={name}";
+        var result = await _cocktailService.SearchByName(name);
 
-        return await GetFromApi(url);
+        if (result == null)
+        {
+            return StatusCode(503, "외부 칵테일 서비스 처리 중 오류가 발생했습니다.");
+        }
+
+        return Ok(result);
+    }
+    private IActionResult GetActionByResult(DrinkResponse? result)
+    {
+        if (result == null)
+        {
+            return StatusCode(503, "외부 칵테일 서비스 처리 중 오류가 발생했습니다.");
+        }
+
+        return Ok(result);
     }
 
     [HttpGet("searchByFirstLetter")]
     public async Task<IActionResult> SearchByFirstLetter(char letter)
     {
-        string url = $"https://www.thecocktaildb.com/api/json/v1/1/search.php?f={letter}";
-        return await GetFromApi(url);
+        var result = await _cocktailService.SearchByFirstLetter(letter);
+
+        return GetActionByResult(result);
     }
 
     [HttpGet("searchByIngredient")]
     public async Task<IActionResult> SearchByIngredient(string ingredient)
     {
-        string url = $"https://www.thecocktaildb.com/api/json/v1/1/search.php?i={ingredient}";
-        return await GetFromApi(url);
+        var result = await _cocktailService.SearchByIngredient(ingredient);
+
+        return GetActionByResult(result);
     }
 
     [HttpGet("lookupCocktailById")]
     public async Task<IActionResult> LookupCocktailById(int id)
     {
-        string url = $"https://www.thecocktaildb.com/api/json/v1/1/lookup.php?i={id}";
+        var result = await _cocktailService.LookupCocktailById(id);
 
-        var responseAction = await GetFromApi(url);
-
-        if (responseAction is ObjectResult objectResult && objectResult.StatusCode == 200)
-        {
-            if (objectResult.Value is DrinkResponse drinkResponse)
-            {
-                var translatedResponse = await _translator.TranslateDrinkResponseAsync(drinkResponse);
-
-                return Ok(translatedResponse);
-            }
-        }
-
-        return await GetFromApi(url);
+        return GetActionByResult(result);
     }
 
     [HttpGet("lookupIngredientById")]
     public async Task<IActionResult> LookupIngredientById(int id)
     {
-        string url = $"https://www.thecocktaildb.com/api/json/v1/1/lookup.php?iid={id}";
-        return await GetFromApi(url);
+        var result = await _cocktailService.LookupIngredientById(id);
+
+        return GetActionByResult(result);
     }
 
     [HttpGet("random")]
     public async Task<IActionResult> Random()
     {
-        string url = "https://www.thecocktaildb.com/api/json/v1/1/random.php";
-        return await GetFromApi(url);
+        var result = await _cocktailService.Random();
+
+        return GetActionByResult(result);
     }
 
     [HttpGet("randomTranslated")]
     public async Task<IActionResult> RandomTranslated()
     {
-        string url = "https://www.thecocktaildb.com/api/json/v1/1/random.php";
+        var result = await _cocktailService.RandomTranslated();
 
-        var responseAction = await GetFromApi(url);
-
-        if (responseAction is ObjectResult objectResult && objectResult.StatusCode == 200)
-        {
-            if (objectResult.Value is DrinkResponse drinkResponse)
-            {
-                var translatedResponse = await _translator.TranslateDrinkResponseAsync(drinkResponse);
-
-                return Ok(translatedResponse);
-            }
-        }
-
-        return responseAction;
+        return GetActionByResult(result);
     }
 
     //필터링
     [HttpGet("filterByIngredient")]
     public async Task<IActionResult> FilterByIngredient(string ingredient)
     {
-        string url = $"https://www.thecocktaildb.com/api/json/v1/1/filter.php?i={ingredient}";
-        return await GetFromApi(url);
+        var result = await _cocktailService.FilterByIngredient(ingredient);
+
+        return GetActionByResult(result);
     }
 
     [HttpGet("filterByAlcohol")]
     public async Task<IActionResult> FilterByAlcohol(string alcohol)
     {
-        string url = $"https://www.thecocktaildb.com/api/json/v1/1/filter.php?a={alcohol}";
-        return await GetFromApi(url);
+        var result = await _cocktailService.FilterByAlcohol(alcohol);
+
+        return GetActionByResult(result);
     }
 
     [HttpGet("filterByCategory")]
     public async Task<IActionResult> FilterByCategory(string category)
     {
-        string url = $"https://www.thecocktaildb.com/api/json/v1/1/filter.php?c={category}";
-        return await GetFromApi(url);
+        var result = await _cocktailService.FilterByCategory(category);
+
+        return GetActionByResult(result);
     }
 
     [HttpGet("filterByGlass")]
     public async Task<IActionResult> FilterByGlass(string glass)
     {
-        string url = $"https://www.thecocktaildb.com/api/json/v1/1/filter.php?g={glass}";
-        return await GetFromApi(url);
+        var result = await _cocktailService.FilterByGlass(glass);
+
+        return GetActionByResult(result);
     }
 
 
@@ -160,29 +127,33 @@ public class CocktailController : ControllerBase
     [HttpGet("listCategories")]
     public async Task<IActionResult> ListCategories()
     {
-        string url = "https://www.thecocktaildb.com/api/json/v1/1/list.php?c=list";
-        return await GetFromApi(url);
+        var result = await _cocktailService.ListCategories();
+
+        return GetActionByResult(result);
     }
 
     [HttpGet("listGlasses")]
     public async Task<IActionResult> ListGlasses()
     {
-        string url = "https://www.thecocktaildb.com/api/json/v1/1/list.php?g=list";
-        return await GetFromApi(url);
+        var result = await _cocktailService.ListGlasses();
+
+        return GetActionByResult(result);
     }
 
     [HttpGet("listIngredients")]
     public async Task<IActionResult> ListIngredients()
     {
-        string url = "https://www.thecocktaildb.com/api/json/v1/1/list.php?i=list";
-        return await GetFromApi(url);
+        var result = await _cocktailService.ListIngredients();
+
+        return GetActionByResult(result);
     }
 
     [HttpGet("listAlcoholic")]
     public async Task<IActionResult> ListAlcoholic()
     {
-        string url = "https://www.thecocktaildb.com/api/json/v1/1/list.php?a=list";
-        return await GetFromApi(url);
+        var result = await _cocktailService.ListAlcoholic();
+
+        return GetActionByResult(result);
     }
 
 }

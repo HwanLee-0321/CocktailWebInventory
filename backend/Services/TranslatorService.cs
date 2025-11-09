@@ -5,14 +5,14 @@ using System.Text;
 using System.Text.Json;
 namespace CocktailWebApplication.Services
 {
-    public class Translator
+    public class TranslatorService
     {
         private readonly HttpClient _httpClient;
         private readonly ChatClient _client;
-        public Translator(HttpClient httpClient)
+        public TranslatorService(HttpClient httpClient)
         {
             _httpClient = httpClient;
-            _client = new(model: "gpt-4o-mini", apiKey: Settings.OPEN_AI_API);
+            _client = new(model: "gpt-4o", apiKey: Settings.OPEN_AI_API);
         }
 
         public async Task<string> TranslateToKoreanWithGpt(string sourceText)
@@ -87,6 +87,7 @@ namespace CocktailWebApplication.Services
                 if (!string.IsNullOrEmpty(drink.strInstructions))
                 {
                     drink.strInstructions = await TranslateToKoreanWithGpt(drink.strInstructions);
+                    Console.WriteLine(ExplainCocktail(drink.strDrink!).Result);
                 }
 
             }).ToList();

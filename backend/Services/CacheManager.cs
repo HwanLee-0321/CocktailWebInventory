@@ -1,23 +1,40 @@
 ﻿using System.Collections.Concurrent;
+using System.Reflection.Metadata;
 using System.Text.Json;
 using CocktailWebApplication.Models;
-
 namespace CocktailWebApplication.Services
 {
-    public class CocktailCacheManager
+    public class CacheManager
     {
-        private readonly string _filePath;
+        private string _filePath;
         private readonly ConcurrentDictionary<string, Drink> _cache;
 
-        public CocktailCacheManager(string filePath = "cocktails.json")
+        public CacheManager(string filePath = Constants.filePath)
         {
             _filePath = filePath;
             _cache = new ConcurrentDictionary<string, Drink>();
             LoadFromFile();
         }
 
+        public DrinkResponse? GetCocktailOnCache(string? id)
+        {
+            if (id != null && TryGetDrink(id, out Drink? cachedDrink))
+            {
+                if (cachedDrink != null)
+                {
+                    return new DrinkResponse { drinks = new List<Drink> { cachedDrink } };
+                }
+            }
+
+            return null;
+        }
+
         public bool TryGetDrink(string id, out Drink? drink)
         {
+            foreach (var key in _cache.Keys)
+            {
+                Log.Error(key);
+            }
             return _cache.TryGetValue(id, out drink);
         }
 
@@ -32,7 +49,6 @@ namespace CocktailWebApplication.Services
         private void LoadFromFile()
         {
             if (!File.Exists(_filePath))    return;
-
             try
             {
                 string json = File.ReadAllText(_filePath);
@@ -42,8 +58,8 @@ namespace CocktailWebApplication.Services
                 {
                     foreach (var drink in drinksWrapper.drinks)
                     {
-                        if (!string.IsNullOrWhiteSpace(drink.strDrink))
-                            _cache[drink.strDrink] = drink;
+                        if (!string.IsNullOrWhiteSpace(drink.idDrink))
+                            _cache[drink.idDrink] = drink;
                     }
                 }
             }
@@ -71,5 +87,15 @@ namespace CocktailWebApplication.Services
         {
             public List<Drink>? drinks { get; set; }
         }
+    }
+
+    public class KoCacheManager : CacheManager
+    {
+        public KoCacheManager(string filePath) : base(filePath) { }
+    }
+
+    public class EnCacheManager : CacheManager
+    {
+        public EnCacheManager(string filePath) : base(filePath) { }
     }
 }

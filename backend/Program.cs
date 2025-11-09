@@ -1,4 +1,8 @@
-﻿var builder = WebApplication.CreateBuilder(args);
+﻿using CocktailWebApplication.Services;
+using CocktailWebApplication.Models;
+using System.IO;
+
+var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
@@ -7,7 +11,11 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddHttpClient();
+builder.Services.AddHttpClient<TranslatorService>();
+builder.Services.AddHttpClient("TheCocktailDbClient");
+builder.Services.AddSingleton(sp => new KoCacheManager(Constants.koFilePath));
+builder.Services.AddSingleton(sp => new EnCacheManager(Constants.enFilePath));
+builder.Services.AddScoped<CocktailService>();
 
 var app = builder.Build();
 
