@@ -33,18 +33,34 @@ export async function renderFilters(TASTES){
   if (!baseRoot) return
   baseRoot.innerHTML = ''
   const tax = await Api.taxonomy()
+  const tastesData = TASTES || tax.tastes || []
+  const makeBaseToggle = (id) => {
+    const chip = el('span',{class:'chip', onclick:(e)=>{
+      const isActive = state.bases.has(id)
+      if (isActive) state.bases.delete(id); else state.bases.add(id)
+      e.currentTarget.classList.toggle('active', !isActive)
+      updateCounts(); recommend(); renderSelectedSummary(tastesData)
+    }}, labelBase(id))
+    chip.classList.toggle('active', state.bases.has(id))
+    return chip
+  }
   ;(tax.bases||[]).forEach(b=>{
     const id = b.id || b
-    const active = state.bases.has(id)
-    baseRoot.appendChild(el('span',{class:`chip ${active?'active':''}`, onclick:()=>{ active?state.bases.delete(id):state.bases.add(id); updateCounts(); recommend(); renderSelectedSummary(TASTES) }}, labelBase(id)))
+    baseRoot.appendChild(makeBaseToggle(id))
   })
   const tasteRoot = document.getElementById('tasteFilters')
   tasteRoot.innerHTML = ''
-  ;(TASTES||tax.tastes||[]).forEach(t=>{
-    const active = state.tastes.has(t.id)
-    tasteRoot.appendChild(el('span',{class:`chip ${active?'active':''}`, onclick:()=>{ active?state.tastes.delete(t.id):state.tastes.add(t.id); updateCounts(); recommend(); renderSelectedSummary(TASTES) }}, t.label))
+  ;(tastesData).forEach(t=>{
+    const chip = el('span',{class:'chip', onclick:(e)=>{
+      const isActive = state.tastes.has(t.id)
+      if (isActive) state.tastes.delete(t.id); else state.tastes.add(t.id)
+      e.currentTarget.classList.toggle('active', !isActive)
+      updateCounts(); recommend(); renderSelectedSummary(tastesData)
+    }}, t.label)
+    chip.classList.toggle('active', state.tastes.has(t.id))
+    tasteRoot.appendChild(chip)
   })
-  updateCounts(); renderSelectedSummary(TASTES)
+  updateCounts(); renderSelectedSummary(tastesData)
 }
 
 export async function renderIngredients(){
@@ -53,10 +69,12 @@ export async function renderIngredients(){
   root.innerHTML = ''
   const tax = await Api.taxonomy()
   const cats = (tax.categories||[]).filter(c=>c.id!=='all')
-  for (const cat of cats){
-    if (state.ingCat!=='all' && state.ingCat!==cat.id) continue
-    const list = (await Api.ingredients({ category: cat.id })).items
-    if (!list.length) continue
+  const activeCats = cats.filter(cat => state.ingCat==='all' || state.ingCat===cat.id)
+  const lists = await Promise.all(activeCats.map(cat => Api.ingredients({ category: cat.id })))
+  activeCats.forEach((cat, idx)=>{
+    const result = lists[idx]
+    const list = result?.items || []
+    if (!list.length) return
     const group = el('div',{class:'group'},
       el('div',{class:'group__title'}, cat.label),
       el('div',{class:'ingredients'})
@@ -76,8 +94,8 @@ export async function renderIngredients(){
       grid.appendChild(label)
     })
     root.appendChild(group)
-  }
-  updateCounts(); renderSelectedSummary((await Api.taxonomy()).tastes)
+  })
+  updateCounts(); renderSelectedSummary(tax.tastes||[])
 }
 
 export async function recommend(){

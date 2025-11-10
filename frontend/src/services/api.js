@@ -6,7 +6,30 @@ import { COCKTAILS, INGREDIENTS, BASES, TASTES, CATEGORIES, categoryOfIng } from
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080/api/v1'
 const API_DISABLED = String(import.meta.env.VITE_API_DISABLED || '').toLowerCase() === 'true'
 const DEFAULT_HEADERS = { 'Content-Type': 'application/json' }
+const CACHE_TTL = 5 * 60 * 1000
+const INGREDIENT_CACHE_TTL = 60 * 1000
 
+const cacheStore = new Map()
+const hasStructuredClone = typeof structuredClone === 'function'
+const safeClone = (value) => {
+  try {
+    return hasStructuredClone ? structuredClone(value) : JSON.parse(JSON.stringify(value))
+  } catch {
+    return value
+  }
+}
+function cacheRead(key){
+  const hit = cacheStore.get(key)
+  if (!hit) return
+  if (Date.now() > hit.expire){
+    cacheStore.delete(key)
+    return
+  }
+  return safeClone(hit.value)
+}
+function cacheWrite(key, value, ttl = CACHE_TTL){
+  cacheStore.set(key, { value: safeClone(value), expire: Date.now() + ttl })
+}
 let apiDeadUntil = 0
 const isOffline = () => API_DISABLED || Date.now() < apiDeadUntil
 
@@ -27,13 +50,20 @@ async function fetchJSON(path, opts = {}){
 
 export const Api = {
   async taxonomy(){
+    const cacheKey = 'taxonomy'
+    const cached = cacheRead(cacheKey)
+    if (cached) return cached
     const bases = await fetchJSON('/taxonomy/bases')
     const tastes = await fetchJSON('/taxonomy/tastes')
     const cats = await fetchJSON('/taxonomy/ingredient-categories')
     if (bases.__error || tastes.__error || cats.__error){
-      return { bases: BASES.map(id=>({ id, labelKo: id })), tastes: TASTES, categories: CATEGORIES }
+      const fallback = { bases: BASES.map(id=>({ id, labelKo: id })), tastes: TASTES, categories: CATEGORIES }
+      cacheWrite(cacheKey, fallback)
+      return fallback
     }
-    return { bases: bases.items, tastes: tastes.items, categories: cats.items }
+    const payload = { bases: bases.items, tastes: tastes.items, categories: cats.items }
+    cacheWrite(cacheKey, payload)
+    return payload
   },
   async cocktails(params={}){
     const query = new URLSearchParams()
@@ -52,6 +82,9 @@ export const Api = {
     return res
   },
   async ingredients(params={}){
+    const cacheKey = `ingredients:${params.category||'all'}:${params.q||''}`
+    const cached = cacheRead(cacheKey)
+    if (cached) return cached
     const query = new URLSearchParams()
     if (params.q) query.set('q', params.q)
     if (params.category) query.set('category', params.category)
@@ -60,8 +93,11 @@ export const Api = {
       const list = (params.category && params.category!=='all')
         ? INGREDIENTS.filter(n=> categoryOfIng(n)===params.category)
         : INGREDIENTS
-      return { items: list.filter(n=> params.q? n.toLowerCase().includes(params.q.toLowerCase()): true) }
+      const filtered = { items: list.filter(n=> params.q? n.toLowerCase().includes(params.q.toLowerCase()): true) }
+      cacheWrite(cacheKey, filtered, INGREDIENT_CACHE_TTL)
+      return filtered
     }
+    cacheWrite(cacheKey, res, INGREDIENT_CACHE_TTL)
     return res
   },
   async recommendations(params={}){
