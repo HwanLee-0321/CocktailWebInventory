@@ -8,6 +8,7 @@ namespace CocktailWebApplication.Services
     {
         private string _filePath;
         private readonly ConcurrentDictionary<string, Drink> _cache;
+        private readonly SemaphoreSlim _fileLock = new SemaphoreSlim(1, 1);
 
         public CacheManager(string filePath = Constants.filePath)
         {
@@ -16,13 +17,18 @@ namespace CocktailWebApplication.Services
             LoadFromFile();
         }
 
-        public DrinkResponse? GetCocktailOnCache(string? id)
+        public Drink? GetCocktailOnCache(string? id)
         {
-            if (id != null && TryGetDrink(id, out Drink? cachedDrink))
+            if (string.IsNullOrEmpty(id))
+            {
+                return null;
+            }
+
+            if (TryGetDrink(id, out Drink? cachedDrink))
             {
                 if (cachedDrink != null)
                 {
-                    return new DrinkResponse { drinks = new List<Drink> { cachedDrink } };
+                    return cachedDrink;
                 }
             }
 
@@ -31,19 +37,34 @@ namespace CocktailWebApplication.Services
 
         public bool TryGetDrink(string id, out Drink? drink)
         {
-            foreach (var key in _cache.Keys)
-            {
-                Log.Error(key);
-            }
             return _cache.TryGetValue(id, out drink);
         }
 
-        public void AddDrink(Drink drink)
+        public async void AddDrink(Drink drink)
         {
             if (string.IsNullOrEmpty(drink.idDrink))  return;
 
             _cache[drink.idDrink] = drink;
-            SaveToFile();
+            await SaveToFile();
+        }
+
+        private async Task SaveToFile()
+        {
+            await _fileLock.WaitAsync();
+            try
+            {
+                var wrapper = new DrinksWrapper { drinks = _cache.Values.ToList() };
+                string json = JsonSerializer.Serialize(wrapper, new JsonSerializerOptions { WriteIndented = true });
+                await File.WriteAllTextAsync(_filePath, json);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex.Message);
+            }
+            finally
+            {
+                _fileLock.Release();
+            }
         }
 
         private void LoadFromFile()
@@ -62,20 +83,6 @@ namespace CocktailWebApplication.Services
                             _cache[drink.idDrink] = drink;
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex.Message);
-            }
-        }
-
-        private void SaveToFile()
-        {
-            try
-            {
-                var wrapper = new DrinksWrapper { drinks = _cache.Values.ToList() };
-                string json = JsonSerializer.Serialize(wrapper, new JsonSerializerOptions { WriteIndented = true });
-                File.WriteAllText(_filePath, json);
             }
             catch (Exception ex)
             {
