@@ -13,6 +13,10 @@ html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:
 .link{color:inherit;text-decoration:none;padding:6px 10px;border-radius:8px}
 .link.active{background:#0c0d11;border:1px solid var(--border)}
 .nav .btn.tiny{padding:6px 10px;border-radius:8px}
+.view-prompt{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:rgba(14,15,19,.85);border:1px solid var(--border);border-radius:999px;padding:10px 24px;font-size:14px;color:var(--text);z-index:20;box-shadow:0 10px 30px rgba(0,0,0,.35);backdrop-filter:blur(6px);display:flex;align-items:center;gap:10px}
+.view-prompt span{font-weight:600}
+.view-prompt .hint{font-size:12px;color:var(--muted)}
+.view-prompt[hidden]{display:none}
 
 /* Hero */
 .hero{display:flex;flex-direction:column;gap:16px;align-items:flex-start}

@@ -9,9 +9,17 @@ import { state, syncFromServer } from './state.js'
 const DEFAULT_RECOMMEND_SECTION = 'filters'
 const RECOMMEND_SECTIONS = new Set(['filters','ingredients','results'])
 const DEFAULT_HASH = '#/recommend/filters'
+const VIEW_PROMPTS = {
+  'recommend': '추천 화면 활성화, 아래로 스크롤 해보세요.',
+  'ingredients': '재료 관리 화면 활성화, 아래로 스크롤 해보세요.',
+  'cocktails': '칵테일 목록 화면 활성화, 아래로 스크롤 해보세요.',
+  'favorites': '즐겨찾기 화면 활성화, 아래로 스크롤 해보세요.'
+}
 let recommendReady = false
 let pressStatesBound = false
 let navBound = false
+let promptTimeout = null
+let scrolledOnce = false
 
 // Theme toggle
 document.addEventListener('click', (e) => {
@@ -33,6 +41,32 @@ function showView(id){
   const elv = document.getElementById(id)
   if (elv) elv.hidden = false
 }
+
+function showPrompt(viewKey){
+  const msg = VIEW_PROMPTS[viewKey]
+  const promptEl = document.getElementById('viewPrompt')
+  if (!promptEl || !msg) return
+  promptEl.textContent = msg
+  promptEl.hidden = false
+  clearTimeout(promptTimeout)
+  promptTimeout = setTimeout(()=> hidePrompt(), 6000)
+  scrolledOnce = false
+}
+
+function hidePrompt(){
+  const promptEl = document.getElementById('viewPrompt')
+  if (promptEl) promptEl.hidden = true
+  clearTimeout(promptTimeout)
+  promptTimeout = null
+}
+
+window.addEventListener('scroll', ()=>{
+  if (scrolledOnce) return
+  if (window.scrollY > 40){
+    scrolledOnce = true
+    hidePrompt()
+  }
+})
 
 async function ensureRecommendReady(){
   if (recommendReady) return
@@ -112,6 +146,7 @@ async function route(hash){
     case 'recommend':{
       await ensureRecommendReady()
       showView('view-recommend')
+      showPrompt('recommend')
       const activeSection = setRecommendSection(section)
       const desiredHash = `#/recommend/${activeSection}`
       if (normalized !== desiredHash){
@@ -122,16 +157,19 @@ async function route(hash){
     }
     case 'ingredients':
       showView('view-ingredients')
+      showPrompt('ingredients')
       await renderIngCategoryChips('ingMgrCatFilters', true); await renderIngredientsManager('')
       bindIngredientsOnce()
       break
     case 'cocktails':
       showView('view-cocktails')
+      showPrompt('cocktails')
       bindCocktailsOnce()
       renderCards(document.getElementById('cocktailList'), (await Api.cocktails()).items)
       break
     case 'favorites':
       showView('view-favorites')
+      showPrompt('favorites')
       await renderFavorites()
       break
     default:
