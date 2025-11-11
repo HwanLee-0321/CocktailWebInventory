@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>칵테일 레시피 추천</title>
     <meta name="description" content="재료와 취향을 바탕으로 칵테일 레시피를 추천합니다." />
-    <link rel="icon" href="/favicon.ico" />
+    <link rel="icon" href="/favicon.png" />
     <link rel="preconnect" href="https://images.unsplash.com" crossorigin />
     <script type="module" src="/src/main.js"></script>
     <link rel="stylesheet" href="/src/styles.css" />
@@ -26,28 +26,37 @@
       </div>
     </nav>
 
+    <div id="viewPrompt" class="view-prompt" hidden></div>
+
     <main id="app">
-      <!-- 추천 뷰: 필터를 상단으로 배치 -->
+      <!-- 추천 뷰: 기능별 서브 라우팅 -->
       <section id="view-recommend" data-view hidden>
-        <header class="hero container">
+        <header class="hero hero--simple container">
           <div class="hero__content">
             <h1>칵테일 레시피 추천</h1>
-            <p class="muted">보유 재료와 취향을 선택하고, 가장 잘 맞는 칵테일을 찾아보세요.</p>
+            <p class="muted">검색으로 시작하고 필요한 필터만 골라 간결하게 추천을 받아보세요.</p>
             <div class="row">
               <input id="searchInput" class="input input--lg" type="text" placeholder="칵테일 이름, 재료, 키워드 검색" />
               <button id="recommendBtn" class="btn primary btn--lg">추천 받기</button>
             </div>
-            <div class="hero__hint small muted">예: mojito, lime, sour, whiskey</div>
           </div>
-          <div class="hero__art" aria-hidden="true"></div>
         </header>
 
         <div class="container">
-          <section class="card filters-top">
+          <nav class="recommend-nav card">
+            <a href="#/recommend/filters" class="link" data-recommend-link="filters">필터 선택</a>
+            <a href="#/recommend/ingredients" class="link" data-recommend-link="ingredients">재료 선택</a>
+            <a href="#/recommend/results" class="link" data-recommend-link="results">추천 결과</a>
+          </nav>
+
+          <section class="card card--summary">
             <div class="section">
-              <div class="section__title">선택됨</div>
+              <div class="section__title">선택 요약</div>
               <div id="selectedSummary" class="chips chips--selected"></div>
             </div>
+          </section>
+
+          <section class="card interactive filters-top" data-recommend-view="filters">
             <div class="section">
               <div class="section__title">베이스</div>
               <div id="baseFilters" class="chips"></div>
@@ -56,18 +65,27 @@
               <div class="section__title">취향</div>
               <div id="tasteFilters" class="chips"></div>
             </div>
-            <div class="section">
-              <div class="section__title">보유 재료</div>
-              <div id="ingCatFilters" class="chips" style="margin-bottom:8px"></div>
-              <div id="ingredientsList" class="ingredients"></div>
-            </div>
             <div class="row" style="justify-content:flex-end">
-              <button id="clearBtn" class="btn">초기화</button>
+              <button id="clearBtn" class="btn">필터 초기화</button>
             </div>
           </section>
 
-          <section class="content" style="margin-top:12px">
-            <div id="results" class="results"></div>
+          <section class="card interactive filters-top" data-recommend-view="ingredients" hidden>
+            <div class="section">
+              <div class="section__title">재료 카테고리</div>
+              <div id="ingCatFilters" class="chips"></div>
+            </div>
+            <div class="section">
+              <div class="section__title">보유 재료</div>
+              <div id="ingredientsList" class="ingredients"></div>
+            </div>
+          </section>
+
+          <section class="card interactive recommend-results" data-recommend-view="results" hidden>
+            <div class="section">
+              <div class="section__title">추천 결과</div>
+              <div id="results" class="results"></div>
+            </div>
           </section>
         </div>
       </section>
@@ -91,7 +109,7 @@
               <div class="section__title">카테고리</div>
               <div id="ingMgrCatFilters" class="chips"></div>
             </div>
-            <div id="ingredientsManager" class="ingredients"></div>
+            <div id="ingredientsManager" class="ingredient-groups"></div>
           </div>
         </div>
       </section>
@@ -130,4 +148,3 @@
     </footer>
   </body>
   </html>
-
