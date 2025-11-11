@@ -2,8 +2,9 @@ import { Api } from './services/api.js'
 
 export const state = {
   search:'',
-  bases:new Set(),
-  tastes:new Set(),
+  glasses:new Set(),
+  categories:new Set(),
+  alcoholic:null,
   have:new Set(JSON.parse(localStorage.getItem('have')||'[]')),
   favorites:new Set(JSON.parse(localStorage.getItem('favorites')||'[]')),
   ingCat:'all',
@@ -21,4 +22,3 @@ export async function syncFromServer(){
   const fav = await Api.getFavorites()
   if (fav && Array.isArray(fav.items)) state.favorites = new Set(fav.items)
 }
-

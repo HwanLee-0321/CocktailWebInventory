@@ -4,16 +4,23 @@ import { el } from '../components/common.js'
 import { state, persist } from '../state.js'
 import { updateCounts, renderSelectedSummary, renderIngredients as renderIngredientsInRecommend } from './recommend.js'
 
-export async function renderIngCategoryChips(rootId, isManager=false){
-  const tax = await Api.taxonomy()
+export async function renderIngCategoryChips(rootId, isManager=false, taxonomy=null){
+  const tax = taxonomy || await Api.taxonomy()
   const root = document.getElementById(rootId)
   if (!root) return
   root.innerHTML = ''
-  ;(tax.categories||[]).forEach(cat=>{
+  ;(tax.ingredientCategories||[]).forEach(cat=>{
     const active = (isManager? state.ingMgrCat : state.ingCat) === cat.id
-    root.appendChild(el('span', { class:`chip ${active?'active':''}`, onclick:()=>{
-      if (isManager){ state.ingMgrCat = cat.id; renderIngredientsManager(document.getElementById('ingSearch')?.value||'') }
-      else { state.ingCat = cat.id; renderIngredientsInRecommend() }
+    root.appendChild(el('span', { class:`chip ${active?'active':''}`, onclick:(e)=>{
+      if (isManager){
+        state.ingMgrCat = cat.id
+        renderIngredientsManager(document.getElementById('ingSearch')?.value||'')
+      } else {
+        state.ingCat = cat.id
+        renderIngredientsInRecommend()
+      }
+      root.querySelectorAll('.chip').forEach(ch=>ch.classList.remove('active'))
+      e.currentTarget.classList.add('active')
     }}, cat.label))
   })
 }
@@ -23,7 +30,7 @@ export async function renderIngredientGroups(rootId, items){
   if (!root) return
   root.innerHTML = ''
   const tax = await Api.taxonomy()
-  const cats = (tax.categories||[]).filter(c=>c.id!=='all')
+  const cats = (tax.ingredientCategories||[]).filter(c=>c.id!=='all')
   cats.forEach(cat=>{
     const list = items.filter(n=> n && typeof n==='string' && categoryOfIng(n)===cat.id)
     if (!list.length) return
@@ -38,7 +45,7 @@ export async function renderIngredientGroups(rootId, items){
         el('input',{type:'checkbox',checked:checked?true:undefined, onchange:async e=>{
           if (e.target.checked) { state.have.add(name); await Api.patchInventory([name], []) }
           else { state.have.delete(name); await Api.patchInventory([], [name]) }
-          persist.saveHave(); label.classList.toggle('active', e.target.checked); updateCounts(); renderSelectedSummary((await Api.taxonomy()).tastes)
+          persist.saveHave(); label.classList.toggle('active', e.target.checked); updateCounts(); renderSelectedSummary()
         }}),
         el('span',{class:'box'}),
         el('span',{class:'text'}, name)
@@ -50,7 +57,6 @@ export async function renderIngredientGroups(rootId, items){
 }
 
 export async function renderIngredientsManager(filterText=''){
-  const tax = await Api.taxonomy()
   const items = (await Api.ingredients({ category: state.ingMgrCat })).items.filter(n =>
     n.toLowerCase().includes((filterText||'').toLowerCase())
   )

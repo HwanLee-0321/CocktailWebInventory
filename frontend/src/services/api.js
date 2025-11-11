@@ -1,7 +1,7 @@
 // API service with graceful fallback to local sample data
 // Configure base URL via Vite env: VITE_API_BASE
 
-import { COCKTAILS, INGREDIENTS, BASES, TASTES, CATEGORIES, categoryOfIng } from '../data/sample.js'
+import { COCKTAILS, INGREDIENTS, GLASSES, DRINK_CATEGORIES, ALCOHOL_OPTIONS, INGREDIENT_CATEGORIES, categoryOfIng } from '../data/sample.js'
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080/api/v1'
 const API_DISABLED = String(import.meta.env.VITE_API_DISABLED || '').toLowerCase() === 'true'
@@ -48,20 +48,107 @@ async function fetchJSON(path, opts = {}){
   }
 }
 
+const slugify = (value='')=> value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')
+const matchGlassId = (value='')=>{
+  const slug = slugify(value)
+  if (slug.includes('highball')) return 'highball'
+  if (slug.includes('old-fashioned') || slug.includes('rocks')) return 'rocks'
+  if (slug.includes('margarita')) return 'margarita'
+  if (slug.includes('martini') || slug.includes('coupe')) return 'martini'
+  return 'other-glass'
+}
+const matchCategoryId = (value='')=>{
+  const slug = slugify(value)
+  if (slug.includes('party') || slug.includes('punch')) return 'party'
+  if (slug.includes('classic') || slug.includes('ordinary') || slug.includes('iba')) return 'classic'
+  if (slug.includes('refresh') || slug.includes('cooler') || slug.includes('long')) return 'refreshing'
+  if (slug.includes('dessert') || slug.includes('sweet')) return 'dessert'
+  if (slug.includes('signature') || slug.includes('contemporary')) return 'signature'
+  return 'other'
+}
+const matchAlcoholId = (value='')=>{
+  const slug = slugify(value)
+  if (!slug) return 'alcoholic'
+  return slug.includes('non') ? 'non-alcoholic' : 'alcoholic'
+}
+function normalizeCocktailDbDrink(drink){
+  if (!drink) return null
+  const ingredients = []
+  for (let i=1;i<=15;i+=1){
+    const key = drink[`strIngredient${i}`]
+    if (key && key.trim()) ingredients.push(key.trim().toLowerCase())
+  }
+  const instructions = drink.strInstructions?.trim() || ''
+  return {
+    id: drink.idDrink,
+    name: drink.strDrink,
+    base: (drink.strIngredient1 || '').toLowerCase(),
+    tastes: [drink.strCategory, drink.strIBA].filter(Boolean),
+    ingredients,
+    instructions,
+    image: drink.strDrinkThumb || '',
+    strength: matchAlcoholId(drink.strAlcoholic)==='alcoholic' ? 'medium' : 'light',
+    glassId: matchGlassId(drink.strGlass),
+    categoryId: matchCategoryId(drink.strCategory),
+    alcoholicId: matchAlcoholId(drink.strAlcoholic),
+    details:{
+      method: drink.strTags || '',
+      glass: drink.strGlass || '',
+      garnish: drink.strIBA || '',
+      steps: instructions ? instructions.split('.').map(s=>s.trim()).filter(Boolean) : undefined,
+      enjoy: ''
+    }
+  }
+}
+async function fetchCocktailDbPopular(){
+  const cacheKey = 'cocktaildb:popular'
+  const cached = cacheRead(cacheKey)
+  if (cached) return cached
+  const externalUrl = import.meta.env.VITE_COCKTAIL_DB_URL || 'https://www.thecocktaildb.com/api/json/v2/1/popular.php'
+  const res = await fetch(externalUrl)
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const data = await res.json()
+  const mapped = (data?.drinks || []).map(normalizeCocktailDbDrink).filter(Boolean)
+  cacheWrite(cacheKey, mapped, CACHE_TTL)
+  return mapped
+}
+async function getFallbackCocktails(){
+  try {
+    const external = await fetchCocktailDbPopular()
+    if (external.length) return external
+  } catch (err){
+    console.warn('[api] fallback cocktaildb error:', err?.message || err)
+  }
+  return COCKTAILS
+}
+
 export const Api = {
   async taxonomy(){
     const cacheKey = 'taxonomy'
     const cached = cacheRead(cacheKey)
     if (cached) return cached
-    const bases = await fetchJSON('/taxonomy/bases')
-    const tastes = await fetchJSON('/taxonomy/tastes')
-    const cats = await fetchJSON('/taxonomy/ingredient-categories')
-    if (bases.__error || tastes.__error || cats.__error){
-      const fallback = { bases: BASES.map(id=>({ id, labelKo: id })), tastes: TASTES, categories: CATEGORIES }
+    const [glasses, alcoholic, drinkCats, ingredientCats] = await Promise.all([
+      fetchJSON('/taxonomy/glasses'),
+      fetchJSON('/taxonomy/alcoholic'),
+      fetchJSON('/taxonomy/drink-categories'),
+      fetchJSON('/taxonomy/ingredient-categories'),
+    ])
+    if (glasses.__error || alcoholic.__error || drinkCats.__error || ingredientCats.__error){
+      const fallback = {
+        glasses: GLASSES,
+        alcoholic: ALCOHOL_OPTIONS,
+        drinkCategories: DRINK_CATEGORIES,
+        ingredientCategories: INGREDIENT_CATEGORIES
+      }
       cacheWrite(cacheKey, fallback)
       return fallback
     }
-    const payload = { bases: bases.items, tastes: tastes.items, categories: cats.items }
+    const payload = {
+      glasses: glasses.items,
+      alcoholic: alcoholic.items,
+      drinkCategories: drinkCats.items,
+      ingredientCategories: ingredientCats.items
+    }
     cacheWrite(cacheKey, payload)
     return payload
   },
@@ -71,6 +158,9 @@ export const Api = {
     ;(params.base||[]).forEach(b=> query.append('base', b))
     ;(params.taste||[]).forEach(t=> query.append('taste', t))
     ;(params.ingredient||[]).forEach(i=> query.append('ingredient', i))
+    ;(params.glasses||[]).forEach(g=> query.append('glass', g))
+    ;(params.categories||[]).forEach(c=> query.append('category', c))
+    if (params.alcoholic) query.set('alcoholic', params.alcoholic)
     if (params.strength) query.set('strength', params.strength)
     const res = await fetchJSON(`/cocktails${query.toString()?`?${query}`:''}`)
     if (res.__error) return { items: COCKTAILS, total: COCKTAILS.length }
@@ -103,26 +193,40 @@ export const Api = {
   async recommendations(params={}){
     const query = new URLSearchParams()
     if (params.q) query.set('q', params.q)
-    ;(params.bases||[]).forEach(b=> query.append('bases', b))
-    ;(params.tastes||[]).forEach(t=> query.append('tastes', t))
-    ;(params.have||[]).forEach(i=> query.append('have', i))
+    ;(params.glasses||[]).forEach(g=> query.append('glass', g))
+    ;(params.categories||[]).forEach(c=> query.append('category', c))
+    ;(params.ingredients||[]).forEach(i=> query.append('ingredient', i))
+    if (params.alcoholic) query.set('alcoholic', params.alcoholic)
     const res = await fetchJSON(`/recommendations${query.toString()?`?${query}`:''}`)
     if (res.__error){
-      // simple local scoring fallback
-      const tasteSet = new Set(params.tastes||[])
-      const baseSet = new Set(params.bases||[])
-      const haveSet = new Set(params.have||[])
+      const glassSet = new Set(params.glasses||[])
+      const categorySet = new Set(params.categories||[])
+      const haveSet = new Set((params.ingredients||[]).map(i=>i.toLowerCase()))
+      const alcoholic = params.alcoholic || null
       const q = (params.q||'').toLowerCase()
-      const scored = COCKTAILS.map(c=>{
+      const dataset = await getFallbackCocktails()
+      const filtered = dataset.filter(c=>{
+        if (glassSet.size && !glassSet.has(c.glassId)) return false
+        if (categorySet.size && !categorySet.has(c.categoryId)) return false
+        if (alcoholic && c.alcoholicId !== alcoholic) return false
+        if (haveSet.size){
+          const intersects = c.ingredients.some(name=> haveSet.has(name.toLowerCase()))
+          if (!intersects) return false
+        }
+        return true
+      })
+      const hasConstraints = glassSet.size>0 || categorySet.size>0 || haveSet.size>0 || Boolean(alcoholic) || q.length>0
+      const pool = filtered.length || hasConstraints ? filtered : dataset
+      const scored = pool.map(c=>{
         let score = 0
         if (q){
-          const hay = [c.name,c.base,...c.tastes,...c.ingredients].join(' ').toLowerCase()
+          const hay = [c.name,c.base,c.details?.glass,c.details?.garnish,...(c.tastes||[]),...(c.ingredients||[])].join(' ').toLowerCase()
           score += hay.includes(q) ? 2 : -5
         }
-        score += (baseSet.size===0 || baseSet.has(c.base)) ? 2 : -3
-        c.tastes.forEach(t=>{ if (tasteSet.has(t)) score += 1 })
-        score += c.ingredients.filter(i=>haveSet.has(i)).length * 1.5
-        if (c.strength==='strong' && tasteSet.has('sweet')) score -= .5
+        if (glassSet.size) score += glassSet.has(c.glassId) ? 3 : -3
+        if (categorySet.size) score += categorySet.has(c.categoryId) ? 2 : -2
+        if (alcoholic) score += c.alcoholicId === alcoholic ? 2 : -4
+        score += c.ingredients.filter(i=> haveSet.has(i.toLowerCase())).length * 1.5
         return { cocktail:c, score }
       }).filter(x=>x.score>-3).sort((a,b)=>b.score-a.score)
       return { items: scored, total: scored.length }

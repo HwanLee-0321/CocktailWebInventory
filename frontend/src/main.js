@@ -72,9 +72,9 @@ async function ensureRecommendReady(){
   if (recommendReady) return
   recommendReady = true
   const taxonomy = await Api.taxonomy()
-  await renderFilters(taxonomy.tastes)
-  await renderIngCategoryChips('ingCatFilters')
-  await renderIngredients()
+  await renderFilters(taxonomy)
+  await renderIngCategoryChips('ingCatFilters', false, taxonomy)
+  await renderIngredients(taxonomy)
   await recommend()
   bindRecommendOnce()
 }
