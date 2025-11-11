@@ -8,6 +8,7 @@ namespace CocktailWebApplication.Services
 {
     public class TranslatorService
     {
+        private readonly JsonDocument _jsonDoc;
         private readonly HttpClient _httpClient;
         private readonly ChatClient _client1;
         private readonly ChatClient _client2;
@@ -16,6 +17,26 @@ namespace CocktailWebApplication.Services
             _httpClient = httpClient;
             _client1 = new(model: "gpt-4o", apiKey: Settings.OPEN_AI_API);
             _client2 = new(model: "gpt-3.5-turbo", apiKey: Settings.OPEN_AI_API);
+            var jsonText = File.ReadAllText(Constants.translationFilePath);
+            _jsonDoc = JsonDocument.Parse(jsonText);
+        }
+
+
+        public string Translate(string input)
+        {
+            foreach (var section in _jsonDoc.RootElement.EnumerateObject())
+            {
+                var category = section.Value;
+                foreach (var prop in category.EnumerateObject())
+                {
+                    if (prop.Name.Equals(input, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return prop.Value.GetString() ?? input;
+                    }
+                }
+            }
+
+            return input;
         }
 
         public async Task<string> ToKoreanSentenceWithGpt(string sourceText)
@@ -33,7 +54,7 @@ namespace CocktailWebApplication.Services
         public async Task<string> ToKoreanWordsWithGpt(string sourceText)
         {
             if (string.IsNullOrEmpty(sourceText)) return "";
-            string systemPrompt =@"
+            string systemPrompt = @"
 You are a professional bartender and translator. 
 Your task is to translate English cocktail ingredients and their measurement units into natural Korean, preserving meaning and readability. 
 
@@ -137,7 +158,7 @@ Output:
             {
                 return;
             }
-            
+
             foreach (JsonNode? drink in drinks)
             {
                 string? category = drink?[readStr]?.ToString();

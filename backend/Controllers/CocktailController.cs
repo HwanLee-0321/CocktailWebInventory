@@ -1,8 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using CocktailWebApplication.Models;
+using Sprache;
 
 [ApiController]
-[Route("api/cocktail")]
+[Route("api/[controller]")]
 public class CocktailController : ControllerBase
 {
     private readonly CocktailService _cocktailService;
@@ -12,34 +13,27 @@ public class CocktailController : ControllerBase
         _cocktailService = cocktailService;
     }
 
-    private IActionResult GetActionByResult<T>(T? result)
+    private IActionResult GetActionByResult(DrinkResponse? result)
     {
         if (result == null)
         {
             return StatusCode(503, "외부 칵테일 서비스 처리 중 오류가 발생했습니다.");
         }
 
-        return Ok(result);
+        return Ok(new CocktailResponse(result));
     }
 
     [HttpGet("SearchByName")]
     public async Task<IActionResult> SearchByName(string name)
     {
         var result = await _cocktailService.SearchByName(name);
-
-        if (result == null)
-        {
-            return StatusCode(503, "외부 칵테일 서비스 처리 중 오류가 발생했습니다.");
-        }
-
-        return Ok(result);
+        return GetActionByResult(result);
     }
 
     [HttpGet("searchByFirstLetter")]
     public async Task<IActionResult> SearchByFirstLetter(char letter)
     {
         var result = await _cocktailService.SearchByFirstLetter(letter);
-
         return GetActionByResult(result);
     }
 
@@ -47,15 +41,13 @@ public class CocktailController : ControllerBase
     public async Task<IActionResult> Random()
     {
         var result = await _cocktailService.Random();
-
         return GetActionByResult(result);
     }
 
-    [HttpGet("lookupCocktailById")]
+    [HttpGet("{id}")]
     public async Task<IActionResult> LookupCocktailById(string id)
     {
         var result = await _cocktailService.LookupCocktailById(id);
-
         return GetActionByResult(result);
     }
 
@@ -63,7 +55,6 @@ public class CocktailController : ControllerBase
     public async Task<IActionResult> LookupIngredientById(int id)
     {
         var result = await _cocktailService.LookupIngredientById(id);
-
         return GetActionByResult(result);
     }
 
@@ -71,7 +62,6 @@ public class CocktailController : ControllerBase
     public async Task<IActionResult> SearchByIngredient(string ingredient)
     {
         var result = await _cocktailService.FilterByIngredient(ingredient);
-
         return GetActionByResult(result);
     }
 
@@ -82,11 +72,18 @@ public class CocktailController : ControllerBase
         return GetActionByResult(result);
     }
 
+    [HttpGet]
+    public async Task<IActionResult> Fillter([FromQuery] string? alcoholic, [FromQuery] string? category,
+        [FromQuery] string? glass, [FromQuery] List<string>? ingredient, [FromQuery] string? strength)
+    {
+        var result = await _cocktailService.Filter(alcoholic, category, glass, ingredient, strength);
+        return GetActionByResult(result);
+    }
+
     [HttpGet("filterByAlcohol")]
     public async Task<IActionResult> FilterByAlcohol(string alcohol)
     {
         var result = await _cocktailService.FilterByAlcohol(alcohol);
-
         return GetActionByResult(result);
     }
 
@@ -94,7 +91,6 @@ public class CocktailController : ControllerBase
     public async Task<IActionResult> FilterByCategory(string category)
     {
         var result = await _cocktailService.FilterByCategory(category);
-
         return GetActionByResult(result);
     }
 
@@ -102,39 +98,6 @@ public class CocktailController : ControllerBase
     public async Task<IActionResult> FilterByGlass(string glass)
     {
         var result = await _cocktailService.FilterByGlass(glass);
-
-        return GetActionByResult(result);
-    }
-
-    [HttpGet("listCategories")]
-    public async Task<IActionResult> ListCategories()
-    {
-        var result = await _cocktailService.ListCategories();
-
-        return GetActionByResult(result);
-    }
-
-    [HttpGet("listGlasses")]
-    public async Task<IActionResult> ListGlasses()
-    {
-        var result = await _cocktailService.ListGlasses();
-
-        return GetActionByResult(result);
-    }
-
-    [HttpGet("listIngredients")]
-    public async Task<IActionResult> ListIngredients()
-    {
-        var result = await _cocktailService.ListIngredients();
-
-        return GetActionByResult(result);
-    }
-
-    [HttpGet("listAlcoholic")]
-    public async Task<IActionResult> ListAlcoholic()
-    {
-        var result = await _cocktailService.ListAlcoholic();
-
         return GetActionByResult(result);
     }
 

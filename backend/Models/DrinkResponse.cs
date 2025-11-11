@@ -64,6 +64,44 @@ namespace CocktailWebApplication.Models
 
         public string? strDescription { get; set; }
 
+        public List<string> GetIngredients()
+        {
+            var ingredients = new List<string>();
+
+            foreach (var prop in GetType().GetProperties())
+            {
+                if (prop.Name.StartsWith("strIngredient"))
+                {
+                    var value = prop.GetValue(this) as string;
+
+                    if (!string.IsNullOrWhiteSpace(value))
+                    {
+                        ingredients.Add(value.Trim());
+                    }
+                }
+            }
+
+            return ingredients;
+        }
+        public List<string> GetMeasures()
+        {
+            var measures = new List<string>();
+
+            foreach (var prop in GetType().GetProperties())
+            {
+                if (prop.Name.StartsWith("strMeasure"))
+                {
+                    var value = prop.GetValue(this) as string;
+
+                    if (!string.IsNullOrWhiteSpace(value))
+                    {
+                        measures.Add(value.Trim());
+                    }
+                }
+            }
+
+            return measures;
+        }
         public Drink() { }
 
         public Drink(Drink original)

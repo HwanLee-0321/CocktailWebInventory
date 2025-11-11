@@ -68,7 +68,7 @@ public class CocktailService
         return await DetailInfoCocktail(drinkResponse);
     }
 
-    public async Task<DrinkResponse?> FilterByIngredients(List<string> ingredients)
+    public async Task<DrinkResponse> FilterByIngredients(List<string> ingredients)
     {
         string str = string.Join(",", ingredients);
         string url = $"https://www.thecocktaildb.com/api/json/v2/1/filter.php?i={str}";
@@ -82,43 +82,33 @@ public class CocktailService
         return await DetailInfoCocktail(drinkResponse);
     }
 
-    public async Task<DrinkResponse?> Filter(List<string> ingredients)
+    public async Task<DrinkResponse> Intersect(List<DrinkResponse> drinkResponses)
     {
-        if (ingredients == null || ingredients.Count == 0)
+        if (drinkResponses == null || drinkResponses.Count == 0)
         {
             return new DrinkResponse { drinks = new List<Drink>() };
         }
-
-        List<Task<DrinkResponse>> tasks = new List<Task<DrinkResponse>>();
-        foreach (string ingredient in ingredients)
-        {
-            tasks.Add(FilterByIngredient(ingredient));
-        }
-
-        if (!tasks.Any())
-        {
-            return new DrinkResponse { drinks = new List<Drink>() };
-        }
-
-        DrinkResponse[] responses = await Task.WhenAll(tasks);
 
         var sets = new List<HashSet<string>>();
 
-        foreach (var response in responses)
+        foreach (var response in drinkResponses)
         {
             var drinkIdSet = new HashSet<string>();
 
-            foreach (var drink in response.drinks)
+            if (response.drinks != null)
             {
-                if (drink.idDrink != null)
+                foreach (var drink in response.drinks)
                 {
-                    drinkIdSet.Add(drink.idDrink);
+                    if (!string.IsNullOrEmpty(drink.idDrink))
+                    {
+                        drinkIdSet.Add(drink.idDrink);
+                    }
                 }
             }
 
             if (drinkIdSet.Count > 0)
             {
-                sets.Add(drinkIdSet);
+                sets.Add(drinkIdSet); // ← 여기 추가해야 교집합 가능
             }
         }
 
@@ -128,7 +118,6 @@ public class CocktailService
         }
 
         var intersection = new HashSet<string>(sets.First());
-
         foreach (var set in sets.Skip(1))
         {
             intersection.IntersectWith(set);
@@ -143,7 +132,6 @@ public class CocktailService
         var detailResponses = await Task.WhenAll(detailTasks);
 
         var drinks = new List<Drink>();
-
         foreach (var response in detailResponses)
         {
             if (response?.drinks != null)
@@ -155,22 +143,40 @@ public class CocktailService
         return new DrinkResponse { drinks = drinks };
     }
 
-    public async Task<DrinkResponse?> FilterByAlcohol(string alcohol)
+    public async Task<DrinkResponse> FilterByAlcohol(string alcohol)
     {
         string url = $"https://www.thecocktaildb.com/api/json/v2/1/filter.php?a={alcohol}";
-        return await GetDrinkFromApi(url);
+        DrinkResponse? drinkResponse = await GetDrinkFromApi(url);
+        if (drinkResponse == null || drinkResponse.drinks == null)
+        {
+            return new DrinkResponse();
+        }
+
+        return await DetailInfoCocktail(drinkResponse);
     }
 
-    public async Task<DrinkResponse?> FilterByCategory(string category)
+    public async Task<DrinkResponse> FilterByCategory(string category)
     {
         string url = $"https://www.thecocktaildb.com/api/json/v2/1/filter.php?c={category}";
-        return await GetDrinkFromApi(url);
+        DrinkResponse? drinkResponse = await GetDrinkFromApi(url);
+        if (drinkResponse == null || drinkResponse.drinks == null)
+        {
+            return new DrinkResponse();
+        }
+
+        return await DetailInfoCocktail(drinkResponse);
     }
 
-    public async Task<DrinkResponse?> FilterByGlass(string glass)
+    public async Task<DrinkResponse> FilterByGlass(string glass)
     {
         string url = $"https://www.thecocktaildb.com/api/json/v2/1/filter.php?g={glass}";
-        return await GetDrinkFromApi(url);
+        DrinkResponse? drinkResponse = await GetDrinkFromApi(url);
+        if (drinkResponse == null || drinkResponse.drinks == null)
+        {
+            return new DrinkResponse();
+        }
+
+        return await DetailInfoCocktail(drinkResponse);
     }
 
     public async Task<TaxonomyResponse?> ListCategories()
@@ -186,15 +192,27 @@ public class CocktailService
         List<TaxonomyItem> items = await GetTraslateResponse("categories", (id, label) => new TaxonomyItem
         {
             id = id,
-            labelKo = label
+            label = label
         });
         return new TaxonomyResponse { items = items };
     }
 
-    public async Task<DrinkResponse?> ListGlasses()
+    public async Task<TaxonomyResponse?> ListGlasses()
     {
         string url = "https://www.thecocktaildb.com/api/json/v2/1/list.php?g=list";
-        return await GetDrinkFromApi(url);
+        string? json = await GetFromAPI(url);
+        if (json == null)
+        {
+            return new TaxonomyResponse();
+        }
+
+        await _translator.GetTranslationFromJson("glass", "strGlass", json);
+        List<TaxonomyItem> items = await GetTraslateResponse("glass", (id, label) => new TaxonomyItem
+        {
+            id = id,
+            label = label
+        });
+        return new TaxonomyResponse { items = items };
     }
 
     public async Task<TaxonomyResponse?> ListIngredients()
@@ -206,19 +224,31 @@ public class CocktailService
             return new TaxonomyResponse();
         }
 
-        await _translator.GetTranslationFromJson("bases", "strIngredient1", json);
-        List<TaxonomyItem> items = await GetTraslateResponse("bases", (id, label) => new TaxonomyItem
+        await _translator.GetTranslationFromJson("ingredient", "strIngredient1", json);
+        List<TaxonomyItem> items = await GetTraslateResponse("ingredient", (id, label) => new TaxonomyItem
         {
             id = id,
-            labelKo = label
+            label = label
         });
         return new TaxonomyResponse { items = items };
     }
 
-    public async Task<DrinkResponse?> ListAlcoholic()
+    public async Task<TaxonomyResponse?> ListAlcoholic()
     {
         string url = "https://www.thecocktaildb.com/api/json/v2/1/list.php?a=list";
-        return await GetDrinkFromApi(url);
+        string? json = await GetFromAPI(url);
+        if (json == null)
+        {
+            return new TaxonomyResponse();
+        }
+
+        await _translator.GetTranslationFromJson("alcoholic", "strAlcoholic", json);
+        List<TaxonomyItem> items = await GetTraslateResponse("alcoholic", (id, label) => new TaxonomyItem
+        {
+            id = id,
+            label = label
+        });
+        return new TaxonomyResponse { items = items };
     }
 
     private DrinkResponse GetCocktailOnCache(DrinkResponse drinkResponse)
@@ -291,8 +321,8 @@ public class CocktailService
 
             if (willSaveCache && result != null)
             {
-                //DrinkResponse drinkResponse = await TranslateToKorean(result);
-                DrinkResponse drinkResponse = result;
+                DrinkResponse drinkResponse = await TranslateToKorean(result);
+                //DrinkResponse drinkResponse = result;
                 foreach (var d in drinkResponse.drinks)
                 {
                     _koCacheManager.AddDrink(d);
@@ -319,76 +349,111 @@ public class CocktailService
         Drink translatedDrink = new Drink(translateDrink);
         DrinkResponse translatedResponse = new DrinkResponse { drinks = new List<Drink> { translatedDrink } };
 
-        Task<string> drinkTask = _translator.ToKoreanNameWithGpt(translateDrink.strDrink!);
-        Task<string> categoryTask = _translator.ToKoreanWordsWithPapago(translateDrink.strCategory!);
-        Task<string> alcoholicTask = _translator.ToKoreanWordsWithPapago(translateDrink.strAlcoholic!);
-        Task<string> glassTask = _translator.ToKoreanWordsWithPapago(translateDrink.strGlass!);
-        Task<string> instructionsTask = _translator.ToKoreanSentenceWithGpt(translateDrink.strInstructions!);
+        //foreach(Drink drink in drinkResponse.drinks)
+        //{
+        //    translateDrink.strDrink = _translator.Translate(drink.strDrink!);
+        //    translateDrink.strCategory = _translator.Translate(drink.strCategory!);
+        //    translateDrink.strAlcoholic = _translator.Translate(drink.strAlcoholic!);
+        //    translateDrink.strGlass = _translator.Translate(drink.strGlass!);
+
+        //    translateDrink.strIngredient1 = _translator.Translate(drink.strIngredient1!);
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient2!),
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient3!),
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient4!),
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient5!),
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient6!),
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient7!),
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient8!),
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient9!),
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient10!),
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient11!),
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient12!),
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient13!),
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient14!),
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient15!);
+        //    for (int i = 0; i < 15; i++)
+        //    {
+        //        var ingredientProp = typeof(Drink).GetProperty($"strIngredient{i + 1}");
+        //        if (ingredientProp != null)
+        //        {
+        //            ingredientProp.SetValue(translatedDrink, _translator.Translate(ingredients[i]));
+
+        //        }
+        //    }
+
+        //    for (int i = 0; i < 15; i++)
+        //    {
+        //        var measureProp = typeof(Drink).GetProperty($"strMeasure{i + 1}");
+        //        if (measureProp != null)
+        //            measureProp.SetValue(translatedDrink, _translator.Translate(measures[i]));
+        //    }
+
+
+        //}
+        //Task<string> instructionsTask = _translator.ToKoreanSentenceWithGpt(translateDrink.strInstructions!);
         Task<string> descriptionTask = _translator.ExplainCocktail(translateDrink.strDrink!);
-        //Task<List<string>> ingredientTask = TranslateIngredientsInBatch(translateDrink, "strIngredient");
-        //Task<List<string>> measureTask = TranslateIngredientsInBatch(translateDrink, "strMeasure");
 
-        var ingredientTasks = new List<Task<string>>
-        {
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strIngredient1!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strIngredient2!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strIngredient3!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strIngredient4!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strIngredient5!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strIngredient6!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strIngredient7!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strIngredient8!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strIngredient9!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strIngredient10!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strIngredient11!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strIngredient12!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strIngredient13!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strIngredient14!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strIngredient15!)
-        };
+        //var ingredientTasks = new List<Task<string>>
+        //{
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient1!),
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient2!),
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient3!),
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient4!),
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient5!),
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient6!),
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient7!),
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient8!),
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient9!),
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient10!),
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient11!),
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient12!),
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient13!),
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient14!),
+        //    _translator.Translate(drinkResponse.drinks.First().strIngredient15!)
+        //};
 
-        var measureTasks = new List<Task<string>>
-        {
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strMeasure1!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strMeasure2!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strMeasure3!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strMeasure4!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strMeasure5!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strMeasure6!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strMeasure7!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strMeasure8!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strMeasure9!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strMeasure10!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strMeasure11!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strMeasure12!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strMeasure13!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strMeasure14!),
-            _translator.ToKoreanWordsWithPapago(drinkResponse.drinks.First().strMeasure15!)
-        };
+        //var measureTasks = new List<Task<string>>
+        //{
+        //    _translator.Translate(drinkResponse.drinks.First().strMeasure1!),
+        //    _translator.Translate(drinkResponse.drinks.First().strMeasure2!),
+        //    _translator.Translate(drinkResponse.drinks.First().strMeasure3!),
+        //    _translator.Translate(drinkResponse.drinks.First().strMeasure4!),
+        //    _translator.Translate(drinkResponse.drinks.First().strMeasure5!),
+        //    _translator.Translate(drinkResponse.drinks.First().strMeasure6!),
+        //    _translator.Translate(drinkResponse.drinks.First().strMeasure7!),
+        //    _translator.Translate(drinkResponse.drinks.First().strMeasure8!),
+        //    _translator.Translate(drinkResponse.drinks.First().strMeasure9!),
+        //    _translator.Translate(drinkResponse.drinks.First().strMeasure10!),
+        //    _translator.Translate(drinkResponse.drinks.First().strMeasure11!),
+        //    _translator.Translate(drinkResponse.drinks.First().strMeasure12!),
+        //    _translator.Translate(drinkResponse.drinks.First().strMeasure13!),
+        //    _translator.Translate(drinkResponse.drinks.First().strMeasure14!),
+        //    _translator.Translate(drinkResponse.drinks.First().strMeasure15!)
+        //};
 
 
-        await Task.WhenAll(
-            drinkTask, categoryTask, alcoholicTask, glassTask, instructionsTask, descriptionTask,// ingredientTask, measureTask
-            Task.WhenAll(ingredientTasks),
-            Task.WhenAll(measureTasks)
-        );
+        //await Task.WhenAll(
+        //    drinkTask, categoryTask, alcoholicTask, glassTask, instructionsTask, descriptionTask,// ingredientTask, measureTask
+        //    Task.WhenAll(ingredientTasks),
+        //    Task.WhenAll(measureTasks)
+        //);
 
 
-        translatedDrink.strDrink = drinkTask.Result;
-        translatedDrink.strCategory = categoryTask.Result;
-        translatedDrink.strAlcoholic = alcoholicTask.Result;
-        translatedDrink.strGlass = glassTask.Result;
-        translatedDrink.strInstructions = instructionsTask.Result;
+        //translatedDrink.strDrink = drinkTask.Result;
+        //translatedDrink.strCategory = categoryTask.Result;
+        //translatedDrink.strAlcoholic = alcoholicTask.Result;
+        //translatedDrink.strGlass = glassTask.Result;
+        //translatedDrink.strInstructions = instructionsTask.Result;
         translatedDrink.strDescription = descriptionTask.Result;
 
-        for (int i = 0; i < 15; i++)
-        {
-            var ingredientProp = typeof(Drink).GetProperty($"strIngredient{i + 1}");
-            var measureProp = typeof(Drink).GetProperty($"strMeasure{i + 1}");
+        //for (int i = 0; i < 15; i++)
+        //{
+        //    var ingredientProp = typeof(Drink).GetProperty($"strIngredient{i + 1}");
+        //    var measureProp = typeof(Drink).GetProperty($"strMeasure{i + 1}");
 
-            ingredientProp?.SetValue(translatedDrink, ingredientTasks[i].Result);
-            measureProp?.SetValue(translatedDrink, measureTasks[i].Result);
-        }
+        //    ingredientProp?.SetValue(translatedDrink, ingredientTasks[i].Result);
+        //    measureProp?.SetValue(translatedDrink, measureTasks[i].Result);
+        //}
 
         return translatedResponse;
     }
@@ -478,6 +543,33 @@ public class CocktailService
             string labelKo = kvp.Value?.ToString() ?? string.Empty;
             result.Add(factory(id, labelKo));
         }
+
+        return result;
+    }
+
+    public async Task<DrinkResponse> Filter(string? alcoholic, string? category, string? glass, List<string>? ingredient, string? strength)
+    {
+        List<Task<DrinkResponse>> tasks = new List<Task<DrinkResponse>>();
+
+        if (alcoholic != null)
+        {
+            tasks.Add(FilterByAlcohol(alcoholic));
+        }
+        if (category != null)
+        {
+            tasks.Add(FilterByCategory(category));
+        }
+        if (glass != null)
+        {
+            tasks.Add(FilterByGlass(glass));
+        }
+        if (ingredient != null)
+        {
+            tasks.Add(FilterByIngredients(ingredient));
+        }
+
+        DrinkResponse[] responses = await Task.WhenAll(tasks);
+        DrinkResponse result = await Intersect(responses.ToList());
 
         return result;
     }
