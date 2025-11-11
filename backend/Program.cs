@@ -3,8 +3,17 @@ using CocktailWebApplication.Models;
 using System.IO;
 
 var builder = WebApplication.CreateBuilder(args);
-
 // Add services to the container.
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend",
+        policy => policy
+            .WithOrigins("http://localhost:5173") // 프론트엔드 주소
+            .AllowAnyMethod()
+            .AllowAnyHeader());
+});
+
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
