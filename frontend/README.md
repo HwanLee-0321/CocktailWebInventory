@@ -213,4 +213,4 @@ Response 예시 (`GET /me/favorites`):
 - `src/components/` : 카드, 모달, 공통 UI 컴포넌트
 - `src/state.js` : 클라이언트 상태 및 LocalStorage 동기화
 
-필요 시 README를 참고하여 백엔드 목업을 구성하면 프런트 앱을 독립적으로 테스트할 수 있습니다.
+필요 시 README를 참고하여 백엔드 목업을 구성하면 프런트 앱을 독립적으로 테스트할 수 있습니다. 
