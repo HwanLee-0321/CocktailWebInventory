@@ -36,6 +36,8 @@ export const INGREDIENT_CATEGORIES = [
 export const COCKTAILS = [
   {
     id:'mojito', name:'모히토 (Mojito)', base:'rum', glassId:'highball', categoryId:'refreshing', alcoholicId:'alcoholic',
+    categoryLabel:'상큼/청량',
+    tastes:['상큼/청량','민트'],
     ingredients:['rum','lime','mint','sugar','soda'],
     instructions:'라임과 설탕을 으깨고 민트를 넣어 가볍게 빻은 뒤 럼과 얼음을 넣고 소다로 채웁니다.',
     image:'https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=320&auto=format&fit=crop', strength:'light',
@@ -45,6 +47,8 @@ export const COCKTAILS = [
   },
   {
     id:'old-fashioned', name:'올드 패션드 (Old Fashioned)', base:'whiskey', glassId:'rocks', categoryId:'classic', alcoholicId:'alcoholic',
+    categoryLabel:'클래식',
+    tastes:['클래식','위스키'],
     ingredients:['whiskey','sugar','angostura','orange peel'],
     instructions:'설탕과 앙고스투라를 스터하여 위스키를 넣고 얼음으로 희석한 뒤 오렌지 필로 마무리.',
     image:'https://images.unsplash.com/photo-1601084881623-cdf9a8f3a522?q=80&w=320&auto=format&fit=crop', strength:'strong',
@@ -54,6 +58,8 @@ export const COCKTAILS = [
   },
   {
     id:'margarita', name:'마가리타 (Margarita)', base:'tequila', glassId:'margarita', categoryId:'party', alcoholicId:'alcoholic',
+    categoryLabel:'파티 음료',
+    tastes:['파티 음료','상큼함'],
     ingredients:['tequila','triple sec','lime','salt'],
     instructions:'테킬라, 트리플 섹, 라임 주스를 셰이크하고 솔트 림 잔에 따릅니다.',
     image:'https://images.unsplash.com/photo-1604908554027-0c94c41f9a8f?q=80&w=320&auto=format&fit=crop', strength:'medium',
@@ -63,6 +69,8 @@ export const COCKTAILS = [
   },
   {
     id:'negroni', name:'네그로니 (Negroni)', base:'gin', glassId:'rocks', categoryId:'classic', alcoholicId:'alcoholic',
+    categoryLabel:'클래식',
+    tastes:['클래식','비터'],
     ingredients:['gin','campari','sweet vermouth','orange peel'],
     instructions:'진, 캄파리, 스위트 베르무트를 1:1:1로 스터.',
     image:'https://images.unsplash.com/photo-1582582494700-66f27004e70a?q=80&w=320&auto=format&fit=crop', strength:'medium',
@@ -72,6 +80,8 @@ export const COCKTAILS = [
   },
   {
     id:'cosmopolitan', name:'코스모폴리탄 (Cosmopolitan)', base:'vodka', glassId:'martini', categoryId:'party', alcoholicId:'alcoholic',
+    categoryLabel:'파티 음료',
+    tastes:['파티 음료','달콤함'],
     ingredients:['vodka','triple sec','cranberry','lime'],
     instructions:'보드카, 트리플 섹, 크랜베리, 라임을 셰이크.',
     image:'https://images.unsplash.com/photo-1601924582971-b99237a53f6a?q=80&w=320&auto=format&fit=crop', strength:'medium',
@@ -81,6 +91,8 @@ export const COCKTAILS = [
   },
   {
     id:'whiskey-sour', name:'위스키 사워 (Whiskey Sour)', base:'whiskey', glassId:'martini', categoryId:'classic', alcoholicId:'alcoholic',
+    categoryLabel:'클래식',
+    tastes:['클래식','상큼함'],
     ingredients:['whiskey','lemon','sugar','egg white (optional)'],
     instructions:'위스키, 레몬 주스, 시럽, (선택) 흰자를 셰이크 후 더블 스트레인.',
     image:'https://images.unsplash.com/photo-1517705008128-361805f42e86?q=80&w=320&auto=format&fit=crop', strength:'medium',

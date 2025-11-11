@@ -90,6 +90,7 @@ function normalizeCocktailDbDrink(drink){
     strength: matchAlcoholId(drink.strAlcoholic)==='alcoholic' ? 'medium' : 'light',
     glassId: matchGlassId(drink.strGlass),
     categoryId: matchCategoryId(drink.strCategory),
+    categoryLabel: drink.strCategory || '',
     alcoholicId: matchAlcoholId(drink.strAlcoholic),
     details:{
       method: drink.strTags || '',

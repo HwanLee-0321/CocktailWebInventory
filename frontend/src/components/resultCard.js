@@ -1,8 +1,19 @@
 import { el, labelBase, labelIng } from './common.js'
 import { openModalFor } from './modal.js'
 
+const toLabel = (c)=>{
+  if (!c) return ''
+  const tags = Array.isArray(c.tastes) ? c.tastes.filter(Boolean) : []
+  if (tags.length) return tags.join(' • ')
+  if (c.categoryLabel) return c.categoryLabel
+  if (c.categoryId) return c.categoryId
+  if (c.alcoholicId) return c.alcoholicId === 'non-alcoholic' ? '무알코올' : '알코올'
+  return ''
+}
+
 export function ResultCard({ cocktail, stars = 0, onFavorite, isFavorite }){
   const c = cocktail
+  const metaLine = toLabel(c)
   return el('article',{class:'card result', onclick:()=> openModalFor(c)},
     el('div',{class:'header'},
       el('img',{src:c.image,alt:c.name}),
@@ -12,7 +23,7 @@ export function ResultCard({ cocktail, stars = 0, onFavorite, isFavorite }){
           el('span',{class:'badge'},labelBase(c.base)),
           stars ? el('span',{class:'stars'},'★'.repeat(stars)) : null
         ),
-        el('div',{class:'muted small'},c.tastes.join(' • '))
+        metaLine ? el('div',{class:'muted small'},metaLine) : null
       )
     ),
     el('div',{class:'kvs'},
@@ -24,4 +35,3 @@ export function ResultCard({ cocktail, stars = 0, onFavorite, isFavorite }){
     )
   )
 }
-
