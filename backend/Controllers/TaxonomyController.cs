@@ -43,8 +43,8 @@ public class TaxonomyController : ControllerBase
         return GetActionByResult(result);
     }
 
-    [HttpGet("ingredient-categories")]
-    public async Task<IActionResult> GetIngredient()
+    [HttpGet("ingredient")]
+    public async Task<IActionResult> GetIngredientCategories()
     {
         var result = await _cocktailService.ListIngredients();
         return GetActionByResult(result);

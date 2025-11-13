@@ -4,13 +4,13 @@ using System.Text.Json;
 using CocktailWebApplication.Models;
 namespace CocktailWebApplication.Services
 {
-    public class CacheManager
+    public class Cache
     {
         private string _filePath;
         private readonly ConcurrentDictionary<string, Drink> _cache;
         private readonly SemaphoreSlim _fileLock = new SemaphoreSlim(1, 1);
 
-        public CacheManager(string filePath = Constants.filePath)
+        public Cache(string filePath = Constants.filePath)
         {
             _filePath = filePath;
             _cache = new ConcurrentDictionary<string, Drink>();
@@ -54,7 +54,12 @@ namespace CocktailWebApplication.Services
             try
             {
                 var wrapper = new DrinksWrapper { drinks = _cache.Values.ToList() };
-                string json = JsonSerializer.Serialize(wrapper, new JsonSerializerOptions { WriteIndented = true });
+                string json = JsonSerializer.Serialize(wrapper, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    WriteIndented = true,
+                    Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+                });
                 await File.WriteAllTextAsync(_filePath, json);
             }
             catch (Exception ex)
@@ -96,12 +101,12 @@ namespace CocktailWebApplication.Services
         }
     }
 
-    public class KoCacheManager : CacheManager
+    public class KoCacheManager : Cache
     {
         public KoCacheManager(string filePath) : base(filePath) { }
     }
 
-    public class EnCacheManager : CacheManager
+    public class EnCacheManager : Cache
     {
         public EnCacheManager(string filePath) : base(filePath) { }
     }
