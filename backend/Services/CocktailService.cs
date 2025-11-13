@@ -4,15 +4,16 @@ using CocktailWebApplication.Models;
 using System.Text.Json;
 using System;
 using System.Text.Json.Nodes;
+using System.Reflection.Metadata.Ecma335;
 
 public class CocktailService
 {
     private readonly HttpClient _httpClient;
-    private readonly TranslatorService _translator;
-    private readonly CacheManager _koCacheManager;
-    private readonly CacheManager _enCacheManager;
+    private readonly Translator _translator;
+    private readonly Cache _koCacheManager;
+    private readonly Cache _enCacheManager;
 
-    public CocktailService(IHttpClientFactory httpClientFactory, TranslatorService translator, KoCacheManager koCacheManager, EnCacheManager enCacheManager)
+    public CocktailService(IHttpClientFactory httpClientFactory, Translator translator, KoCacheManager koCacheManager, EnCacheManager enCacheManager)
     {
         _httpClient = httpClientFactory.CreateClient("TheCocktailDbClient");
         _translator = translator;
@@ -20,23 +21,16 @@ public class CocktailService
         _enCacheManager = enCacheManager;
     }
 
-    public async Task<DrinkResponse?> SearchByName(string name)
-    {
-        string url = $"https://www.thecocktaildb.com/api/json/v2/1/search.php?s={name}";
-
-        return await GetDrinkFromApi(url);
-    }
-
-    public async Task<DrinkResponse?> SearchByFirstLetter(char letter)
-    {
-        string url = $"https://www.thecocktaildb.com/api/json/v2/1/search.php?f={letter}";
-        return await GetDrinkFromApi(url);
-    }
-
     public async Task<DrinkResponse?> Random()
     {
         string url = "https://www.thecocktaildb.com/api/json/v2/1/random.php";
-        return await GetDrinkFromApi(url, true);
+        DrinkResponse? drinkResponse = await GetDrinkFromApi(url);
+        if (drinkResponse == null || drinkResponse.drinks == null)
+        {
+            return new DrinkResponse();
+        }
+
+        return await DetailInfoCocktail(drinkResponse);
     }
 
     public async Task<DrinkResponse?> LookupCocktailById(string id)
@@ -50,13 +44,194 @@ public class CocktailService
         return await GetDrinkFromApi(url, true);
     }
 
-    public async Task<DrinkResponse?> LookupIngredientById(int id)
+    public async Task<TaxonomyResponse?> ListCategories()
+    {
+        string url = "https://www.thecocktaildb.com/api/json/v2/1/list.php?c=list";
+        string? json = await GetFromAPI(url);
+        if (json == null)
+        {
+            return new TaxonomyResponse();
+        }
+
+        await _translator.GetTranslationFromJson("categories", "strCategory", json);
+        List<TaxonomyItem> items = await GetTraslateResponse("categories", (id, label) => new TaxonomyItem
+        {
+            id = id,
+            labelKo = label
+        });
+        return new TaxonomyResponse { items = items };
+
+    }
+
+    public async Task<TaxonomyResponse?> ListGlasses()
+    {
+        string url = "https://www.thecocktaildb.com/api/json/v2/1/list.php?g=list";
+        string? json = await GetFromAPI(url);
+        if (json == null)
+        {
+            return new TaxonomyResponse();
+        }
+
+        await _translator.GetTranslationFromJson("glass", "strGlass", json);
+        List<TaxonomyItem> items = await GetTraslateResponse("glass", (id, label) => new TaxonomyItem
+        {
+            id = id,
+            labelKo = label
+        });
+        return new TaxonomyResponse { items = items };
+    }
+
+    public async Task<TaxonomyResponse?> ListIngredients()
+    {
+        string url = "https://www.thecocktaildb.com/api/json/v2/1/list.php?i=list";
+        string? json = await GetFromAPI(url);
+        if (json == null)
+        {
+            return new TaxonomyResponse();
+        }
+
+        await _translator.GetTranslationFromJson("ingredient", "strIngredient1", json);
+        List<TaxonomyItem> items = await GetTraslateResponse("ingredient", (id, label) => new TaxonomyItem
+        {
+            id = id,
+            labelKo = label
+        });
+        return new TaxonomyResponse { items = items };
+    }
+
+    public async Task<TaxonomyResponse?> ListAlcoholic()
+    {
+        string url = "https://www.thecocktaildb.com/api/json/v2/1/list.php?a=list";
+        string? json = await GetFromAPI(url);
+        if (json == null)
+        {
+            return new TaxonomyResponse();
+        }
+
+        await _translator.GetTranslationFromJson("alcoholic", "strAlcoholic", json);
+        List<TaxonomyItem> items = await GetTraslateResponse("alcoholic", (id, label) => new TaxonomyItem
+        {
+            id = id,
+            labelKo = label
+        });
+        return new TaxonomyResponse { items = items };
+    }
+
+    public async Task<DrinkResponse> AllSearchByQuery(List<string>? q)
+    {
+        string path = ".\\data\\cocktails_en.json";
+        string jsonString = File.ReadAllText(path);
+        List<Drink> matchingDrinks = new List<Drink>();
+        List<string> searchList = new List<string>() { "strDrink", "strCategory", "strAlcoholic"};
+        for(int i = 1; i <= 15; i++)
+        {
+            searchList.Add("strIngredient" + i);
+        }
+
+        if (jsonString == null) return new DrinkResponse();
+        JsonObject jsonObject = JsonNode.Parse(jsonString).AsObject();
+
+        if (jsonObject["drinks"]!.AsArray() is JsonArray drinksArray)
+        {
+            foreach (var node in drinksArray)
+            {
+                bool isMatchFound = false;
+                if (node is JsonObject drinkObject)
+                {
+                    foreach(string list in searchList)
+                    {
+                        JsonNode propertyNode = drinkObject[list]!;
+                        if (propertyNode is JsonValue drinkValue && drinkValue.GetValue<string>() is string drinkValueString)
+                        {
+                            foreach (string searchQ in q)
+                            {
+                                if (drinkValueString.Equals(searchQ, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    string str = drinkObject.ToJsonString();
+                                    Drink drinkModel = JsonSerializer.Deserialize<Drink>(str);
+
+                                    if (drinkModel != null)
+                                    {
+                                        // List<Drink>에 Drink 모델 객체를 추가
+                                        matchingDrinks.Add(drinkModel);
+                                        isMatchFound = true;
+                                        break; // 검색 성공 시 즉시 탈출
+                                    }
+                                }
+                            }
+                            if (isMatchFound)
+                            {
+                                break;
+                            }
+
+                        }
+
+                    }
+                }
+            }
+        }
+        return new DrinkResponse { drinks = matchingDrinks };
+
+    }
+
+    public async Task<DrinkResponse> Filter(List<string>? q, string? alcoholic, string? category, string? glass, List<string>? ingredient, string? strength)
+    {
+        List<Task<DrinkResponse>> tasks = new List<Task<DrinkResponse>>();
+
+        if (q != null)
+        {
+            tasks.Add(AllSearchByQuery(q));
+        }
+        if (alcoholic != null)
+        {
+            tasks.Add(FilterByAlcohol(alcoholic));
+        }
+        if (category != null)
+        {
+            tasks.Add(FilterByCategory(category));
+        }
+        if (glass != null)
+        {
+            tasks.Add(FilterByGlass(glass));
+        }
+        if (ingredient != null)
+        {
+            tasks.Add(FilterByIngredients(ingredient));
+        }
+
+        DrinkResponse[] responses = await Task.WhenAll(tasks);
+
+        responses = responses.Where(r => r?.drinks != null).ToArray();
+
+        return await Intersect(responses.ToList());
+    }
+
+    private async Task<DrinkResponse?> SearchByName(string name)
+    {
+        string url = $"https://www.thecocktaildb.com/api/json/v2/1/search.php?s={name}";
+
+        return await GetDrinkFromApi(url);
+    }
+
+    private async Task<DrinkResponse?> SearchByFirstLetter(char letter)
+    {
+        string url = $"https://www.thecocktaildb.com/api/json/v2/1/search.php?f={letter}";
+        return await GetDrinkFromApi(url);
+    }
+
+    private async Task<string?> SearchIngredientByName(string name)
+    {
+        string url = $"https://www.thecocktaildb.com/api/json/v1/1/search.php?i={name}";
+        return await GetFromAPI(url);
+    }
+
+    private async Task<DrinkResponse?> LookupIngredientById(int id)
     {
         string url = $"https://www.thecocktaildb.com/api/json/v2/1/lookup.php?iid={id}";
         return await GetDrinkFromApi(url);
     }
 
-    public async Task<DrinkResponse> FilterByIngredient(string ingredient)
+    private async Task<DrinkResponse> FilterByIngredient(string ingredient)
     {
         string url = $"https://www.thecocktaildb.com/api/json/v2/1/filter.php?i={ingredient}";
         DrinkResponse? drinkResponse = await GetDrinkFromApi(url);
@@ -68,7 +243,7 @@ public class CocktailService
         return await DetailInfoCocktail(drinkResponse);
     }
 
-    public async Task<DrinkResponse> FilterByIngredients(List<string> ingredients)
+    private async Task<DrinkResponse> FilterByIngredients(List<string> ingredients)
     {
         string str = string.Join(",", ingredients);
         string url = $"https://www.thecocktaildb.com/api/json/v2/1/filter.php?i={str}";
@@ -82,7 +257,7 @@ public class CocktailService
         return await DetailInfoCocktail(drinkResponse);
     }
 
-    public async Task<DrinkResponse> Intersect(List<DrinkResponse> drinkResponses)
+    private async Task<DrinkResponse> Intersect(List<DrinkResponse> drinkResponses)
     {
         if (drinkResponses == null || drinkResponses.Count == 0)
         {
@@ -108,7 +283,7 @@ public class CocktailService
 
             if (drinkIdSet.Count > 0)
             {
-                sets.Add(drinkIdSet); // ← 여기 추가해야 교집합 가능
+                sets.Add(drinkIdSet);
             }
         }
 
@@ -143,7 +318,7 @@ public class CocktailService
         return new DrinkResponse { drinks = drinks };
     }
 
-    public async Task<DrinkResponse> FilterByAlcohol(string alcohol)
+    private async Task<DrinkResponse> FilterByAlcohol(string alcohol)
     {
         string url = $"https://www.thecocktaildb.com/api/json/v2/1/filter.php?a={alcohol}";
         DrinkResponse? drinkResponse = await GetDrinkFromApi(url);
@@ -155,7 +330,7 @@ public class CocktailService
         return await DetailInfoCocktail(drinkResponse);
     }
 
-    public async Task<DrinkResponse> FilterByCategory(string category)
+    private async Task<DrinkResponse> FilterByCategory(string category)
     {
         string url = $"https://www.thecocktaildb.com/api/json/v2/1/filter.php?c={category}";
         DrinkResponse? drinkResponse = await GetDrinkFromApi(url);
@@ -167,7 +342,7 @@ public class CocktailService
         return await DetailInfoCocktail(drinkResponse);
     }
 
-    public async Task<DrinkResponse> FilterByGlass(string glass)
+    private async Task<DrinkResponse> FilterByGlass(string glass)
     {
         string url = $"https://www.thecocktaildb.com/api/json/v2/1/filter.php?g={glass}";
         DrinkResponse? drinkResponse = await GetDrinkFromApi(url);
@@ -179,77 +354,6 @@ public class CocktailService
         return await DetailInfoCocktail(drinkResponse);
     }
 
-    public async Task<TaxonomyResponse?> ListCategories()
-    {
-        string url = "https://www.thecocktaildb.com/api/json/v2/1/list.php?c=list";
-        string? json = await GetFromAPI(url);
-        if (json == null)
-        {
-            return new TaxonomyResponse();
-        }
-
-        await _translator.GetTranslationFromJson("categories", "strCategory", json);
-        List<TaxonomyItem> items = await GetTraslateResponse("categories", (id, label) => new TaxonomyItem
-        {
-            id = id,
-            label = label
-        });
-        return new TaxonomyResponse { items = items };
-    }
-
-    public async Task<TaxonomyResponse?> ListGlasses()
-    {
-        string url = "https://www.thecocktaildb.com/api/json/v2/1/list.php?g=list";
-        string? json = await GetFromAPI(url);
-        if (json == null)
-        {
-            return new TaxonomyResponse();
-        }
-
-        await _translator.GetTranslationFromJson("glass", "strGlass", json);
-        List<TaxonomyItem> items = await GetTraslateResponse("glass", (id, label) => new TaxonomyItem
-        {
-            id = id,
-            label = label
-        });
-        return new TaxonomyResponse { items = items };
-    }
-
-    public async Task<TaxonomyResponse?> ListIngredients()
-    {
-        string url = "https://www.thecocktaildb.com/api/json/v2/1/list.php?i=list";
-        string? json = await GetFromAPI(url);
-        if (json == null)
-        {
-            return new TaxonomyResponse();
-        }
-
-        await _translator.GetTranslationFromJson("ingredient", "strIngredient1", json);
-        List<TaxonomyItem> items = await GetTraslateResponse("ingredient", (id, label) => new TaxonomyItem
-        {
-            id = id,
-            label = label
-        });
-        return new TaxonomyResponse { items = items };
-    }
-
-    public async Task<TaxonomyResponse?> ListAlcoholic()
-    {
-        string url = "https://www.thecocktaildb.com/api/json/v2/1/list.php?a=list";
-        string? json = await GetFromAPI(url);
-        if (json == null)
-        {
-            return new TaxonomyResponse();
-        }
-
-        await _translator.GetTranslationFromJson("alcoholic", "strAlcoholic", json);
-        List<TaxonomyItem> items = await GetTraslateResponse("alcoholic", (id, label) => new TaxonomyItem
-        {
-            id = id,
-            label = label
-        });
-        return new TaxonomyResponse { items = items };
-    }
 
     private DrinkResponse GetCocktailOnCache(DrinkResponse drinkResponse)
     {
@@ -321,8 +425,7 @@ public class CocktailService
 
             if (willSaveCache && result != null)
             {
-                DrinkResponse drinkResponse = await TranslateToKorean(result);
-                //DrinkResponse drinkResponse = result;
+                DrinkResponse drinkResponse = await _translator.TranslateResponse(result);
                 foreach (var d in drinkResponse.drinks)
                 {
                     _koCacheManager.AddDrink(d);
@@ -340,152 +443,6 @@ public class CocktailService
         {
             Log.Error($"Deserialization fail: {ex.Message}");
             return null;
-        }
-    }
-
-    private async Task<DrinkResponse> TranslateToKorean(DrinkResponse drinkResponse)
-    {
-        Drink translateDrink = drinkResponse.drinks.First();
-        Drink translatedDrink = new Drink(translateDrink);
-        DrinkResponse translatedResponse = new DrinkResponse { drinks = new List<Drink> { translatedDrink } };
-
-        //foreach(Drink drink in drinkResponse.drinks)
-        //{
-        //    translateDrink.strDrink = _translator.Translate(drink.strDrink!);
-        //    translateDrink.strCategory = _translator.Translate(drink.strCategory!);
-        //    translateDrink.strAlcoholic = _translator.Translate(drink.strAlcoholic!);
-        //    translateDrink.strGlass = _translator.Translate(drink.strGlass!);
-
-        //    translateDrink.strIngredient1 = _translator.Translate(drink.strIngredient1!);
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient2!),
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient3!),
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient4!),
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient5!),
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient6!),
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient7!),
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient8!),
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient9!),
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient10!),
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient11!),
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient12!),
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient13!),
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient14!),
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient15!);
-        //    for (int i = 0; i < 15; i++)
-        //    {
-        //        var ingredientProp = typeof(Drink).GetProperty($"strIngredient{i + 1}");
-        //        if (ingredientProp != null)
-        //        {
-        //            ingredientProp.SetValue(translatedDrink, _translator.Translate(ingredients[i]));
-
-        //        }
-        //    }
-
-        //    for (int i = 0; i < 15; i++)
-        //    {
-        //        var measureProp = typeof(Drink).GetProperty($"strMeasure{i + 1}");
-        //        if (measureProp != null)
-        //            measureProp.SetValue(translatedDrink, _translator.Translate(measures[i]));
-        //    }
-
-
-        //}
-        //Task<string> instructionsTask = _translator.ToKoreanSentenceWithGpt(translateDrink.strInstructions!);
-        Task<string> descriptionTask = _translator.ExplainCocktail(translateDrink.strDrink!);
-
-        //var ingredientTasks = new List<Task<string>>
-        //{
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient1!),
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient2!),
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient3!),
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient4!),
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient5!),
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient6!),
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient7!),
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient8!),
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient9!),
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient10!),
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient11!),
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient12!),
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient13!),
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient14!),
-        //    _translator.Translate(drinkResponse.drinks.First().strIngredient15!)
-        //};
-
-        //var measureTasks = new List<Task<string>>
-        //{
-        //    _translator.Translate(drinkResponse.drinks.First().strMeasure1!),
-        //    _translator.Translate(drinkResponse.drinks.First().strMeasure2!),
-        //    _translator.Translate(drinkResponse.drinks.First().strMeasure3!),
-        //    _translator.Translate(drinkResponse.drinks.First().strMeasure4!),
-        //    _translator.Translate(drinkResponse.drinks.First().strMeasure5!),
-        //    _translator.Translate(drinkResponse.drinks.First().strMeasure6!),
-        //    _translator.Translate(drinkResponse.drinks.First().strMeasure7!),
-        //    _translator.Translate(drinkResponse.drinks.First().strMeasure8!),
-        //    _translator.Translate(drinkResponse.drinks.First().strMeasure9!),
-        //    _translator.Translate(drinkResponse.drinks.First().strMeasure10!),
-        //    _translator.Translate(drinkResponse.drinks.First().strMeasure11!),
-        //    _translator.Translate(drinkResponse.drinks.First().strMeasure12!),
-        //    _translator.Translate(drinkResponse.drinks.First().strMeasure13!),
-        //    _translator.Translate(drinkResponse.drinks.First().strMeasure14!),
-        //    _translator.Translate(drinkResponse.drinks.First().strMeasure15!)
-        //};
-
-
-        //await Task.WhenAll(
-        //    drinkTask, categoryTask, alcoholicTask, glassTask, instructionsTask, descriptionTask,// ingredientTask, measureTask
-        //    Task.WhenAll(ingredientTasks),
-        //    Task.WhenAll(measureTasks)
-        //);
-
-
-        //translatedDrink.strDrink = drinkTask.Result;
-        //translatedDrink.strCategory = categoryTask.Result;
-        //translatedDrink.strAlcoholic = alcoholicTask.Result;
-        //translatedDrink.strGlass = glassTask.Result;
-        //translatedDrink.strInstructions = instructionsTask.Result;
-        translatedDrink.strDescription = descriptionTask.Result;
-
-        //for (int i = 0; i < 15; i++)
-        //{
-        //    var ingredientProp = typeof(Drink).GetProperty($"strIngredient{i + 1}");
-        //    var measureProp = typeof(Drink).GetProperty($"strMeasure{i + 1}");
-
-        //    ingredientProp?.SetValue(translatedDrink, ingredientTasks[i].Result);
-        //    measureProp?.SetValue(translatedDrink, measureTasks[i].Result);
-        //}
-
-        return translatedResponse;
-    }
-
-    public async Task<List<string>> TranslateIngredientsInBatch(Drink originalDrink, string str)
-    {
-        var ingredients = new List<string>();
-
-        for (int i = 1; i <= 15; i++)
-        {
-            var propertyName = $"{str}{i}";
-
-            var propertyInfo = typeof(Drink).GetProperty(propertyName);
-            string? ingredient = propertyInfo?.GetValue(originalDrink) as string;
-
-            if (!string.IsNullOrWhiteSpace(ingredient) && !ingredient.Equals("None", StringComparison.OrdinalIgnoreCase))
-            {
-                ingredients.Add(ingredient);
-            }
-        }
-
-        string ingredientsJson = System.Text.Json.JsonSerializer.Serialize(ingredients);
-
-        var translatedJson = await _translator.ToKoreanWordsWithGpt(ingredientsJson);
-        try
-        {
-            return JsonSerializer.Deserialize<List<string>>(translatedJson) ?? new List<string>();
-        }
-        catch (JsonException)
-        {
-            Log.Error("Not json format");
-            return new List<string>();
         }
     }
 
@@ -517,7 +474,7 @@ public class CocktailService
         return new DrinkResponse { drinks = finalDrinksList };
     }
 
-    public async Task<List<T>> GetTraslateResponse<T>(string sectionKey, Func<string, string, T> factory)
+    private async Task<List<T>> GetTraslateResponse<T>(string sectionKey, Func<string, string, T> factory)
     {
         string path = ".\\data\\translation_ko.json";
 
@@ -547,30 +504,113 @@ public class CocktailService
         return result;
     }
 
-    public async Task<DrinkResponse> Filter(string? alcoholic, string? category, string? glass, List<string>? ingredient, string? strength)
+    private async Task<List<string>> LoadJsonTranslation()
     {
-        List<Task<DrinkResponse>> tasks = new List<Task<DrinkResponse>>();
+        string path = ".\\data\\translation_ko.json";
+        var englishKeys = new List<string>();
+        JsonNode jsonData;
+        if (File.Exists(path))
+        {
+            string existingJson = await File.ReadAllTextAsync(path);
 
-        if (alcoholic != null)
-        {
-            tasks.Add(FilterByAlcohol(alcoholic));
+            jsonData = JsonNode.Parse(existingJson) ?? new JsonObject();
         }
-        if (category != null)
+        else
         {
-            tasks.Add(FilterByCategory(category));
-        }
-        if (glass != null)
-        {
-            tasks.Add(FilterByGlass(glass));
-        }
-        if (ingredient != null)
-        {
-            tasks.Add(FilterByIngredients(ingredient));
+            jsonData = new JsonObject();
         }
 
-        DrinkResponse[] responses = await Task.WhenAll(tasks);
-        DrinkResponse result = await Intersect(responses.ToList());
+        if (jsonData is JsonObject jsonObject)
+        {
+            if (jsonObject.TryGetPropertyValue("ingredient", out var ingredientNode) && ingredientNode is JsonObject ingredientObject)
+            {
+                foreach (var property in ingredientObject)
+                {
+                    englishKeys.Add(property.Key);
+                }
+            }
+        }
 
-        return result;
+        return englishKeys;
     }
+
+    private async Task<TaxonomyResponse> ListIngredientsCategories()
+    {
+        var collectedTypes = new List<string>();
+        var fetchTasks = new List<Task<string?>>();
+
+        var t = await LoadJsonTranslation();
+
+        foreach (var name in t)
+        {
+            if (string.IsNullOrWhiteSpace(name)) continue;
+
+            fetchTasks.Add(SearchIngredientByName(name));
+        }
+
+        string?[] allJsons = await Task.WhenAll(fetchTasks);
+
+        foreach (var json in allJsons)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                continue;
+            }
+
+            try
+            {
+                var response = JsonSerializer.Deserialize<IngredientResponse>(json);
+
+                string? type = response?.ingredients?
+                                       .FirstOrDefault(i => !string.IsNullOrWhiteSpace(i.strType))
+                                       ?.strType;
+
+                if (!string.IsNullOrWhiteSpace(type))
+                {
+                    string trimmedType = type.Trim();
+                    if (!collectedTypes.Contains(trimmedType))
+                    {
+                        collectedTypes.Add(trimmedType);
+                    }
+                }
+            }
+            catch (JsonException ex)
+            {
+                Log.Error(ex.Message);
+            }
+        }
+
+        var taxonomyItems = new List<TaxonomyItem>();
+
+        foreach (var englishType in collectedTypes)
+        {
+            taxonomyItems.Add(new TaxonomyItem
+            {
+                id = englishType,
+                labelKo = englishType
+            });
+        }
+        var resultWrapper = new
+        {
+            ingredients = taxonomyItems
+        };
+
+        string json1 = JsonSerializer.Serialize(resultWrapper, new JsonSerializerOptions
+        {
+            WriteIndented = true
+        });
+
+        await _translator.GetTranslationFromJson("ingredient-categories", "id", json1, "ingredients");
+        List<TaxonomyItem> items = await GetTraslateResponse("ingredient-categories", (id, label) => new TaxonomyItem
+        {
+            id = id,
+            labelKo = label
+        });
+        return new TaxonomyResponse { items = items };
+    }
+
+    //private async Task<CocktailResponse> FilterByIngredientCategories()
+    //{
+
+    //}
 }

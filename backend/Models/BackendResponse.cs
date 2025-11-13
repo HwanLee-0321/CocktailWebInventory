@@ -11,7 +11,7 @@ namespace CocktailWebApplication.Models
     public class TaxonomyItem
     {
         public string id { get; set; } = string.Empty;
-        public string label { get; set; } = string.Empty;
+        public string labelKo { get; set; } = string.Empty;
     }
 
     public class CocktailResponse
@@ -35,8 +35,9 @@ namespace CocktailWebApplication.Models
     {
         public string? id { get; set; }
         public string? name { get; set; }
-        public string? bases { get; set; }
-        public string? tastes { get; set; }
+        public string? category { get; set; }
+        public string? glass { get; set; }
+        public string? alcoholic { get; set; }
         public List<string>? ingredients { get; set; }
         public List<string>? measures { get; set; }
         public string? instructions { get; set; }
@@ -49,8 +50,9 @@ namespace CocktailWebApplication.Models
         {
             id = drink.idDrink;
             name = drink.strDrink;
-            bases = "";
-            tastes = "";
+            category = drink.strCategory;
+            glass = drink.strGlass;
+            alcoholic = drink.strAlcoholic;
             ingredients = drink.GetIngredients();
             measures = drink.GetMeasures();
             instructions = drink.strInstructions;

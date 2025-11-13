@@ -11,7 +11,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddHttpClient<TranslatorService>();
+builder.Services.AddHttpClient<Translator>();
 builder.Services.AddHttpClient("TheCocktailDbClient");
 builder.Services.AddSingleton(sp => new KoCacheManager(Constants.koFilePath));
 builder.Services.AddSingleton(sp => new EnCacheManager(Constants.enFilePath));

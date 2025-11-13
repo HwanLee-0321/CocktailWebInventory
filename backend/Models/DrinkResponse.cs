@@ -158,4 +158,12 @@ namespace CocktailWebApplication.Models
             strDescription = original.strDescription;
         }
     }
+    public class IngredientResponse
+    {
+        public List<Ingredient>? ingredients { get; set; }
+    }
+    public class Ingredient
+    {
+        public string? strType { get; set; }
+    }
 }
