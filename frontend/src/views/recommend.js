@@ -140,7 +140,6 @@ export async function renderFilters(taxonomy){
           syncAlcoholChips()
           updateCounts()
           renderSelectedSummary()
-          activateResultsView(true)
           recommend()
         }
       }, opt.label)
@@ -162,7 +161,6 @@ export async function renderFilters(taxonomy){
         setFilterActive('category', cat.id, state.categories.has(cat.id))
         updateCounts()
         renderSelectedSummary()
-        activateResultsView(true)
         recommend()
       }
       }, cat.label)
