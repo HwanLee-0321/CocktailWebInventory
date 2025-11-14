@@ -142,13 +142,37 @@ async function ensureCatalog(){
 }
 
 async function loadStaticCatalog(){
-  if (!USE_STATIC_JSON) return buildCatalog(COCKTAILS)
-  const res = await fetch(STATIC_DATA_URL, { cache: 'no-store' })
-  if (!res.ok) throw new Error(`Failed to fetch ${STATIC_DATA_URL} (${res.status})`)
-  const payload = await res.json()
-  const drinks = Array.isArray(payload?.drinks) ? payload.drinks : []
-  const normalized = drinks.map(normalizeCocktailDbDrink).filter(Boolean)
-  return buildCatalog(normalized.length ? normalized : COCKTAILS)
+  if (!USE_STATIC_JSON) return buildCatalog(COCKTAILS);
+  const STATIC_DATA_URL_EN = '/cocktails_en.json';
+  const [koRes, enRes] = await Promise.all([
+    fetch(STATIC_DATA_URL, { cache: 'no-store' }),
+    fetch(STATIC_DATA_URL_EN, { cache: 'no-store' })
+  ]);
+
+  if (!koRes.ok) throw new Error(`Failed to fetch ${STATIC_DATA_URL} (${koRes.status})`);
+  if (!enRes.ok) throw new Error(`Failed to fetch ${STATIC_DATA_URL_EN} (${enRes.status})`);
+
+  const [koPayload, enPayload] = await Promise.all([
+    koRes.json(),
+    enRes.json()
+  ]);
+
+  const enDrinks = Array.isArray(enPayload?.drinks) ? enPayload.drinks : [];
+  const enNameMap = new Map(enDrinks.map(drink => [drink.idDrink, drink.strDrink]));
+
+  const koDrinks = Array.isArray(koPayload?.drinks) ? koPayload.drinks : [];
+  
+  const mergedDrinks = koDrinks.map(koDrink => {
+    const enName = enNameMap.get(koDrink.idDrink);
+    const newDrink = { ...koDrink, strDrinkEn: enName || koDrink.strDrink };
+    if (enName && koDrink.strDrink !== enName) {
+      newDrink.strDrink = `${koDrink.strDrink} (${enName})`;
+    }
+    return newDrink;
+  });
+
+  const normalized = mergedDrinks.map(normalizeCocktailDbDrink).filter(Boolean);
+  return buildCatalog(normalized.length ? normalized : COCKTAILS);
 }
 
 function buildCatalog(list){
@@ -220,6 +244,22 @@ function deriveDrinkCategories(counts){
 const toTitle = (id) => id.replace(/-/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase())
 const formatCategoryLabel = (id) => CATEGORY_LABEL_MAP[id] || toTitle(id || '기타')
 
+function buildSearchHaystack(cocktail = {}){
+  const fields = [
+    cocktail.name,
+    cocktail.nameEn,
+    cocktail.base,
+    cocktail.details?.glass,
+    cocktail.details?.garnish,
+    ...(cocktail.tastes || []),
+    ...(cocktail.ingredients || [])
+  ]
+  return fields
+    .filter(Boolean)
+    .map(value => value.toString().toLowerCase())
+    .join(' ')
+}
+
 function applyCocktailFilters(cocktails, params){
   const q = (params.q || '').toLowerCase().trim()
   const strength = (params.strength || '').toLowerCase()
@@ -232,7 +272,7 @@ function applyCocktailFilters(cocktails, params){
 
   return cocktails.filter(c => {
     if (q){
-      const hay = [c.name, c.base, c.details?.glass, c.details?.garnish, ...(c.tastes || []), ...(c.ingredients || [])].join(' ').toLowerCase()
+      const hay = buildSearchHaystack(c)
       if (!hay.includes(q)) return false
     }
     if (strength && c.strength !== strength) return false
@@ -282,7 +322,7 @@ function buildRecommendations(catalog, params){
 function scoreCocktail(cocktail, q, glassSet, categorySet, haveSet, alcoholic){
   let score = 0
   if (q){
-    const hay = [cocktail.name, cocktail.base, cocktail.details?.glass, cocktail.details?.garnish, ...(cocktail.tastes || []), ...(cocktail.ingredients || [])].join(' ').toLowerCase()
+    const hay = buildSearchHaystack(cocktail)
     score += hay.includes(q) ? 2 : -5
   }
   if (glassSet.size) score += glassSet.has(cocktail.glassId) ? 3 : -3
@@ -348,6 +388,9 @@ const matchAlcoholId = (value = '') => {
 
 function normalizeCocktailDbDrink(drink){
   if (!drink) return null
+  const nameKo = (drink.strDrink || '').trim()
+  const nameEn = (drink.strDrinkEn || '').trim()
+  const displayName = nameKo || nameEn
   const ingredients = []
   for (let i = 1; i <= 15; i += 1){
     const key = drink[`strIngredient${i}`]
@@ -359,7 +402,8 @@ function normalizeCocktailDbDrink(drink){
   const ingredientGroups = normalizeIngredientGroups(drink.ingredientGroups)
   return {
     id: drink.idDrink,
-    name: drink.strDrink,
+    name: displayName,
+    nameEn: nameEn || displayName,
     base: (drink.strIngredient1 || '').toLowerCase(),
     tastes: [drink.strCategory, drink.strIBA].filter(Boolean),
     ingredients,
