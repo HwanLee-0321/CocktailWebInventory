@@ -5,6 +5,9 @@ import { renderPaginatedList } from '../components/pagination.js'
 import { state, storage } from '../state.js'
 
 let taxonomyCache = null
+const requestRecommendSection = (section)=>{
+  window.dispatchEvent(new CustomEvent('recommend:set-section', { detail: section }))
+}
 const ensureTaxonomy = async (tax)=>{
   if (tax) taxonomyCache = tax
   if (!taxonomyCache) taxonomyCache = await Api.taxonomy()
@@ -18,6 +21,22 @@ const setFilterActive = (kind, id, isActive)=>{
 const syncAlcoholChips = ()=> document.querySelectorAll('[data-filter="alcohol"]').forEach(chip=>{
   chip.classList.toggle('active', chip.dataset.id === (state.alcoholic||''))
 })
+const activateResultsView = (delay=false)=>{
+  const target = '#/recommend/results'
+  const run = ()=>{
+    if (location.hash !== target){
+      location.hash = target
+    } else {
+      requestRecommendSection('results')
+    }
+  }
+  if (delay){
+    clearTimeout(activateResultsView.timer)
+    activateResultsView.timer = setTimeout(run, 300)
+  } else {
+    run()
+  }
+}
 
 export function updateCounts(){
   const glassRoot = document.getElementById('glassFilters')
@@ -121,6 +140,7 @@ export async function renderFilters(taxonomy){
           syncAlcoholChips()
           updateCounts()
           renderSelectedSummary()
+          activateResultsView(true)
           recommend()
         }
       }, opt.label)
@@ -139,11 +159,12 @@ export async function renderFilters(taxonomy){
         onclick:()=>{
           if (state.categories.has(cat.id)) state.categories.delete(cat.id)
           else state.categories.add(cat.id)
-          setFilterActive('category', cat.id, state.categories.has(cat.id))
-          updateCounts()
-          renderSelectedSummary()
-          recommend()
-        }
+        setFilterActive('category', cat.id, state.categories.has(cat.id))
+        updateCounts()
+        renderSelectedSummary()
+        activateResultsView(true)
+        recommend()
+      }
       }, cat.label)
       categoryRoot.appendChild(chip)
     })
@@ -180,6 +201,7 @@ export async function renderIngredients(taxonomy){
           label.classList.toggle('active', e.target.checked)
           updateCounts()
           renderSelectedSummary()
+          recommend()
         }}),
         el('span',{class:'box'}),
         el('span',{class:'text'}, labelIng(name))
@@ -203,8 +225,32 @@ export async function recommend(){
   renderRecommendationResults(res.items || [], true)
 }
 
+const buildRecommendPager = ({ current, total, pageSize, totalItems, onChange })=>{
+  const start = (current - 1) * pageSize + 1
+  const end = Math.min(totalItems, current * pageSize)
+  const chunkLabel = `${pageSize}개`
+  const hasPrev = start > 1
+  const hasNext = end < totalItems
+  return el('div',{class:'results-pagination__inner'},
+    el('button',{
+      type:'button',
+      class:'results-pagination__btn',
+      disabled: hasPrev ? undefined : true,
+      onclick:()=> hasPrev && onChange(current - 1)
+    }, `이전 ${chunkLabel}`),
+    el('div',{class:'results-pagination__summary'}, `${start}-${end}개 / 총 ${totalItems}개 · 페이지 ${current}/${total}`),
+    el('button',{
+      type:'button',
+      class:'results-pagination__btn',
+      disabled: hasNext ? undefined : true,
+      onclick:()=> hasNext && onChange(current + 1)
+    }, `다음 ${chunkLabel}`)
+  )
+}
+
 function renderRecommendationResults(items, resetPage = false){
   const root = document.getElementById('results')
+  const pagerRoot = document.getElementById('resultsPagination')
   if (!root) return
   renderPaginatedList({
     container: root,
@@ -213,6 +259,8 @@ function renderRecommendationResults(items, resetPage = false){
     pageSize: 9,
     emptyMessage: '조건에 맞는 추천이 없습니다.',
     resetPage,
+    pagerContainer: pagerRoot,
+    renderPager: pagerRoot ? buildRecommendPager : null,
     renderItem: ({ cocktail, score })=>{
       const stars = Math.max(1, Math.min(5, Math.round((score + 3) / 2)))
       return ResultCard({
@@ -233,6 +281,13 @@ export function bindRecommendOnce(){
   if (bound) return; bound = true
   const search = document.getElementById('searchInput')
   search.addEventListener('input', e=>{ state.search = e.target.value; })
+  search.addEventListener('keydown', e=>{
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    state.search = e.target.value
+    activateResultsView()
+    recommend()
+  })
   document.getElementById('recommendBtn').addEventListener('click', recommend)
   document.getElementById('clearBtn').addEventListener('click', async ()=>{
     state.search='' 

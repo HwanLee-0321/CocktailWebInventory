@@ -1,6 +1,6 @@
 import { bindModalGlobal } from './components/modal.js'
 import { bindRecommendOnce, renderFilters, renderIngredients, recommend } from './views/recommend.js'
-import { bindIngredientsOnce, renderIngCategoryChips, renderIngredientsManager } from './views/ingredients.js'
+import { renderIngCategoryChips } from './views/ingredients.js'
 import { bindCocktailsOnce, renderCards } from './views/cocktails.js'
 import { Api } from './services/api.js'
 import { state } from './state.js'
@@ -8,9 +8,9 @@ import { state } from './state.js'
 const DEFAULT_RECOMMEND_SECTION = 'filters'
 const RECOMMEND_SECTIONS = new Set(['filters','ingredients','results'])
 const DEFAULT_HASH = '#/recommend/filters'
+const DEVICE_MODES = ['desktop','tablet','mobile']
 const VIEW_PROMPTS = {
   'recommend': '추천 화면 활성화, 아래로 스크롤 해보세요.',
-  'ingredients': '재료 관리 화면 활성화, 아래로 스크롤 해보세요.',
   'cocktails': '칵테일 목록 화면 활성화, 아래로 스크롤 해보세요.'
 }
 let recommendReady = false
@@ -18,6 +18,7 @@ let pressStatesBound = false
 let navBound = false
 let promptTimeout = null
 let scrolledOnce = false
+let manualDeviceSelection = false
 
 // Theme toggle
 document.addEventListener('click', (e) => {
@@ -58,6 +59,39 @@ function hidePrompt(){
   promptTimeout = null
 }
 
+const detectDeviceMode = ()=>{
+  const width = window.innerWidth || document.documentElement.clientWidth || 0
+  if (width >= 1024) return 'desktop'
+  if (width >= 640) return 'tablet'
+  return 'mobile'
+}
+
+const setDeviceMode = (mode)=>{
+  const normalized = DEVICE_MODES.includes(mode) ? mode : 'desktop'
+  document.documentElement.dataset.deviceMode = normalized
+  document.querySelectorAll('[data-device-mode]').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.deviceMode === normalized)
+  })
+}
+
+function initDeviceToggle(){
+  const toggle = document.getElementById('deviceToggle')
+  if (!toggle) return
+  const buttons = toggle.querySelectorAll('[data-device-mode]')
+  const autoApply = ()=>{
+    if (manualDeviceSelection) return
+    setDeviceMode(detectDeviceMode())
+  }
+  buttons.forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      manualDeviceSelection = true
+      setDeviceMode(btn.dataset.deviceMode)
+    })
+  })
+  autoApply()
+  window.addEventListener('resize', autoApply)
+}
+
 window.addEventListener('scroll', ()=>{
   if (scrolledOnce) return
   if (window.scrollY > 40){
@@ -89,6 +123,11 @@ function setRecommendSection(section){
   })
   return target
 }
+
+window.addEventListener('recommend:set-section', e=>{
+  const section = e.detail
+  if (section) setRecommendSection(section)
+})
 
 function parseHash(hash){
   const match = (hash||'').match(/^#\/([^/]+)(?:\/([^/]+))?/)
@@ -153,12 +192,6 @@ async function route(hash){
       }
       break
     }
-    case 'ingredients':
-      showView('view-ingredients')
-      showPrompt('ingredients')
-      await renderIngCategoryChips('ingMgrCatFilters', true); await renderIngredientsManager('')
-      bindIngredientsOnce()
-      break
     case 'cocktails':
       showView('view-cocktails')
       showPrompt('cocktails')
@@ -175,5 +208,6 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   bindModalGlobal()
   bindPressStates()
   bindNavLinks()
+  initDeviceToggle()
   route(location.hash||DEFAULT_HASH)
 })

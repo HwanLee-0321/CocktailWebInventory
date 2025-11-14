@@ -8,11 +8,24 @@ export function renderPaginatedList({
   pageSize = 12,
   renderItem,
   emptyMessage = '표시할 항목이 없습니다.',
-  resetPage = false
+  resetPage = false,
+  pagerContainer = null,
+  renderPager = null
 }){
   if (!container) return
   if (!state.pages) state.pages = {}
   if (resetPage || !state.pages[pageKey]) state.pages[pageKey] = 1
+
+  const hidePager = () => {
+    if (!pagerContainer) return
+    pagerContainer.innerHTML = ''
+    pagerContainer.hidden = true
+  }
+  const showPager = () => {
+    if (!pagerContainer) return
+    if (pagerContainer.dataset?.recommendActive === 'false') return
+    pagerContainer.hidden = false
+  }
 
   const renderPage = (pageOverride) => {
     const totalPages = Math.max(1, Math.ceil(items.length / pageSize))
@@ -21,6 +34,7 @@ export function renderPaginatedList({
     container.innerHTML = ''
     if (!items.length){
       container.appendChild(el('div',{class:'empty card'}, emptyMessage))
+      hidePager()
       return
     }
     const slice = items.slice((current - 1) * pageSize, current * pageSize)
@@ -31,7 +45,23 @@ export function renderPaginatedList({
     })
     container.appendChild(frag)
     if (totalPages > 1){
-      container.appendChild(buildPager(current, totalPages, (next)=> renderPage(next)))
+      const onChange = (next)=> renderPage(next)
+      const pagerNode = typeof renderPager === 'function'
+        ? renderPager({ current, total: totalPages, pageSize, totalItems: items.length, onChange })
+        : buildPager(current, totalPages, onChange)
+      if (!pagerNode){
+        hidePager()
+        return
+      }
+      if (pagerContainer){
+        pagerContainer.innerHTML = ''
+        pagerContainer.appendChild(pagerNode)
+        showPager()
+      } else {
+        container.appendChild(pagerNode)
+      }
+    } else {
+      hidePager()
     }
   }
 

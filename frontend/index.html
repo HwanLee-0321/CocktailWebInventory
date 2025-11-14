@@ -16,11 +16,15 @@
         <div class="brand">Cocktail Lab</div>
         <div class="nav__links">
           <a href="#/recommend" class="link" data-link>추천</a>
-          <a href="#/ingredients" class="link" data-link>재료 관리</a>
-          <a href="#/cocktails" class="link" data-link>칵테일 목록</a>
+          <a href="#/cocktails" class="link" data-link>전체 칵테일 목록</a>
         </div>
         <div class="nav__right">
-          <button id="themeToggle" class="btn tiny">테마</button>
+          <div id="deviceToggle" class="device-toggle" role="group" aria-label="디스플레이 모드 선택">
+            <button type="button" class="device-toggle__btn" data-device-mode="desktop">PC</button>
+            <button type="button" class="device-toggle__btn" data-device-mode="tablet">태블릿</button>
+            <button type="button" class="device-toggle__btn" data-device-mode="mobile">모바일</button>
+          </div>
+          <button id="themeToggle" class="btn tiny">블랙 / 화이트 테마</button>
         </div>
       </div>
     </nav>
@@ -90,41 +94,19 @@
               <div id="results" class="results"></div>
             </div>
           </section>
-        </div>
-      </section>
-
-      <!-- 재료 관리 뷰 -->
-      <section id="view-ingredients" data-view hidden>
-        <div class="container">
-          <h2>재료 관리</h2>
-          <div class="card">
-            <div class="row" style="justify-content:space-between">
-              <div class="muted">내 보유 재료를 선택하세요.</div>
-              <div class="row">
-                <button id="ingSelectAll" class="btn tiny">전체 선택</button>
-                <button id="ingClearAll" class="btn tiny">전체 해제</button>
-              </div>
-            </div>
-            <div class="section">
-              <input id="ingSearch" class="input" type="text" placeholder="재료 검색" />
-            </div>
-            <div class="section">
-              <div class="section__title">카테고리</div>
-              <div id="ingMgrCatFilters" class="chips"></div>
-            </div>
-            <div id="ingredientsManager" class="ingredient-groups"></div>
-          </div>
+          <div id="resultsPagination" class="results-pagination" data-recommend-view="results" hidden></div>
         </div>
       </section>
 
       <!-- 칵테일 목록 뷰 -->
       <section id="view-cocktails" data-view hidden>
         <div class="container">
-          <h2>칵테일 목록</h2>
+          <h2>전체 칵테일 목록</h2>
           <div class="row">
             <input id="listSearch" class="input" type="text" placeholder="이름/재료/키워드" />
           </div>
           <div id="cocktailList" class="results" style="margin-top:12px"></div>
+          <div id="cocktailPagination" class="results-pagination" hidden></div>
         </div>
       </section>
 
@@ -138,9 +120,5 @@
         <div id="modalContent"></div>
       </div>
     </div>
-
-    <footer class="footer container muted small">
-      데모 데이터로 동작합니다. 추후 백엔드 API 연동 가능.
-    </footer>
   </body>
   </html>

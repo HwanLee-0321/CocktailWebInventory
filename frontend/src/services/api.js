@@ -3,7 +3,7 @@
 
 import { COCKTAILS, GLASSES, DRINK_CATEGORIES, ALCOHOL_OPTIONS, INGREDIENT_CATEGORIES, categoryOfIng } from '../data/sample.js'
 
-const STATIC_DATA_URL = '/cocktails_en.json'
+const STATIC_DATA_URL = '/cocktails_ko.json'
 const USE_STATIC_JSON = String(import.meta.env.VITE_USE_STATIC_JSON ?? 'true').toLowerCase() !== 'false'
 const DEFAULT_TAXONOMY = {
   glasses: GLASSES,
@@ -154,23 +154,40 @@ async function loadStaticCatalog(){
 function buildCatalog(list){
   const ingredientSet = new Set()
   const ingredientCategoryMap = new Map()
+  const drinkCategoryCounts = new Map()
+  const addIngredient = (name, categoryId) => {
+    if (!name) return
+    if (!ingredientSet.has(name)) ingredientSet.add(name)
+    if (!ingredientCategoryMap.has(name)){
+      ingredientCategoryMap.set(name, categoryId || categorizeIngredient(name))
+    }
+  }
   list.forEach(cocktail => {
-    (cocktail.ingredients || []).forEach(name => {
-      if (!name) return
-      if (!ingredientSet.has(name)){
-        ingredientSet.add(name)
-        ingredientCategoryMap.set(name, categorizeIngredient(name))
-      }
-    })
+    const catId = cocktail.categoryId || 'other'
+    const catLabel = cocktail.categoryLabel || formatCategoryLabel(catId)
+    if (!drinkCategoryCounts.has(catId)){
+      drinkCategoryCounts.set(catId, { count: 0, label: catLabel })
+    }
+    drinkCategoryCounts.get(catId).count += 1
+    const groups = Array.isArray(cocktail.ingredientGroups) ? cocktail.ingredientGroups : null
+    if (groups?.length){
+      groups.forEach(group => {
+        const categoryId = group.categoryId || 'other'
+        ;(group.items || []).forEach(item => addIngredient(item, categoryId))
+      })
+    }
+    (cocktail.ingredients || []).forEach(name => addIngredient(name))
   })
   const ingredients = Array.from(ingredientSet).sort((a, b) => a.localeCompare(b))
   const ingredientCategories = deriveIngredientCategories(ingredientCategoryMap)
+  const drinkCategories = deriveDrinkCategories(drinkCategoryCounts)
   return {
     cocktails: list,
     ingredients,
     ingredientCategoryMap,
     taxonomy: {
       ...DEFAULT_TAXONOMY,
+      drinkCategories: drinkCategories.length ? drinkCategories : DEFAULT_TAXONOMY.drinkCategories,
       ingredientCategories
     }
   }
@@ -187,6 +204,17 @@ function deriveIngredientCategories(map){
     .sort((a, b) => b[1] - a[1])
     .map(([id]) => ({ id, label: formatCategoryLabel(id) }))
   return [{ id: 'all', label: formatCategoryLabel('all') }, ...ordered]
+}
+
+function deriveDrinkCategories(counts){
+  if (!counts || !counts.size) return []
+  return [...counts.entries()]
+    .filter(([id]) => id && id !== 'all')
+    .sort((a, b) => {
+      if (b[1].count !== a[1].count) return b[1].count - a[1].count
+      return a[0].localeCompare(b[0])
+    })
+    .map(([id, info]) => ({ id, label: info.label || formatCategoryLabel(id) }))
 }
 
 const toTitle = (id) => id.replace(/-/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase())
@@ -277,13 +305,26 @@ function toLowerSet(value){
 }
 
 const slugify = (value = '') => value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+const slugifyLocale = (value = '') => value.toString().trim().toLowerCase()
+  .replace(/[^\p{L}\p{N}]+/gu, '-')
+  .replace(/^-|-$/g, '')
 
 const matchGlassId = (value = '') => {
+  const normalized = value.toString().trim().toLowerCase()
   const slug = slugify(value)
-  if (slug.includes('highball')) return 'highball'
-  if (slug.includes('old-fashioned') || slug.includes('rocks')) return 'rocks'
-  if (slug.includes('margarita')) return 'margarita'
-  if (slug.includes('martini') || slug.includes('coupe')) return 'martini'
+  const matches = (...terms) => terms.some(term => term && normalized.includes(term))
+  if (slug.includes('highball') || slug.includes('collins') || matches('하이볼', '콜린스')) return 'highball'
+  if (
+    slug.includes('old-fashioned') ||
+    slug.includes('rocks') ||
+    matches('올드패션', '위스키', '온더락', '록스')
+  ) return 'rocks'
+  if (slug.includes('margarita') || matches('마가리타')) return 'margarita'
+  if (
+    slug.includes('martini') ||
+    slug.includes('coupe') ||
+    matches('마티니', '쿠페', '칵테일')
+  ) return 'martini'
   return 'other-glass'
 }
 
@@ -307,6 +348,9 @@ function normalizeCocktailDbDrink(drink){
     if (key && key.trim()) ingredients.push(key.trim().toLowerCase())
   }
   const instructions = drink.strInstructions?.trim() || ''
+  const categoryLabel = drink.strCategory?.trim() || ''
+  const categoryId = normalizeCategoryId(categoryLabel)
+  const ingredientGroups = normalizeIngredientGroups(drink.ingredientGroups)
   return {
     id: drink.idDrink,
     name: drink.strDrink,
@@ -317,8 +361,8 @@ function normalizeCocktailDbDrink(drink){
     image: drink.strDrinkThumb || '',
     strength: matchAlcoholId(drink.strAlcoholic) === 'alcoholic' ? 'medium' : 'light',
     glassId: matchGlassId(drink.strGlass),
-    categoryId: matchCategoryId(drink.strCategory),
-    categoryLabel: drink.strCategory || '',
+    categoryId,
+    categoryLabel: categoryLabel || formatCategoryLabel(categoryId),
     alcoholicId: matchAlcoholId(drink.strAlcoholic),
     details: {
       method: drink.strTags || '',
@@ -326,7 +370,8 @@ function normalizeCocktailDbDrink(drink){
       garnish: drink.strIBA || '',
       steps: instructions ? instructions.split('.').map(s => s.trim()).filter(Boolean) : undefined,
       enjoy: drink.strDescription || ''
-    }
+    },
+    ingredientGroups
   }
 }
 
@@ -341,4 +386,29 @@ function categorizeIngredient(name){
     if (rule.test.test(normalized)) return rule.id
   }
   return 'other'
+}
+
+function normalizeIngredientGroups(groups){
+  if (!Array.isArray(groups)) return null
+  const normalized = groups.map(group => {
+    if (!group) return null
+    const items = Array.isArray(group.items)
+      ? group.items.map(item => (item || '').toString().trim().toLowerCase()).filter(Boolean)
+      : []
+    if (!items.length) return null
+    const categoryId = (group.categoryId || '').toLowerCase() || categorizeIngredient(items[0])
+    return {
+      categoryId,
+      categoryLabel: group.categoryLabel || formatCategoryLabel(categoryId),
+      items
+    }
+  }).filter(Boolean)
+  return normalized.length ? normalized : null
+}
+
+function normalizeCategoryId(label = ''){
+  const matched = matchCategoryId(label)
+  if (matched && matched !== 'other') return matched
+  const slug = slugifyLocale(label)
+  return slug || 'other'
 }

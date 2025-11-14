@@ -102,7 +102,7 @@ export const COCKTAILS = [
   }
 ]
 
-export const KOR_BASE = { vodka:'보드카', gin:'진', rum:'럼', tequila:'테킬라', whiskey:'위스키' }
+export const KOR_BASE = { vodka:'보드카', gin:'진', rum:'럼', tequila:'테킬라', whiskey:'위스키', applejuice:'사과 주스' }
 export const KOR_ING = {
   'rum':'럼','lime':'라임','mint':'민트','sugar':'설탕','soda':'소다수','angostura':'앙고스투라',
   'orange peel':'오렌지 필','tequila':'테킬라','triple sec':'트리플 섹','salt':'소금','cranberry':'크랜베리',

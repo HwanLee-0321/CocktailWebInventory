@@ -17,6 +17,7 @@ export function bindCocktailsOnce(){
 
 export function renderCards(container, list, resetPage = false){
   if (!container) return
+  const pagerRoot = document.getElementById('cocktailPagination')
   renderPaginatedList({
     container,
     items: list,
@@ -24,6 +25,8 @@ export function renderCards(container, list, resetPage = false){
     pageSize: 12,
     emptyMessage: '표시할 항목이 없습니다.',
     resetPage,
+    pagerContainer: pagerRoot,
+    renderPager: pagerRoot ? buildCocktailPager : null,
     renderItem: (cocktail)=>{
       return ResultCard({
         cocktail,
@@ -35,5 +38,28 @@ export function renderCards(container, list, resetPage = false){
       })
     }
   })
+}
+
+const buildCocktailPager = ({ current, total, pageSize, totalItems, onChange })=>{
+  const start = (current - 1) * pageSize + 1
+  const end = Math.min(totalItems, current * pageSize)
+  const chunkLabel = `${pageSize}개`
+  const hasPrev = start > 1
+  const hasNext = end < totalItems
+  return el('div',{class:'results-pagination__inner'},
+    el('button',{
+      type:'button',
+      class:'results-pagination__btn',
+      disabled: hasPrev ? undefined : true,
+      onclick:()=> hasPrev && onChange(current - 1)
+    }, `이전 ${chunkLabel}`),
+    el('div',{class:'results-pagination__summary'}, `${start}-${end}개 / 총 ${totalItems}개 · 페이지 ${current}/${total}`),
+    el('button',{
+      type:'button',
+      class:'results-pagination__btn',
+      disabled: hasNext ? undefined : true,
+      onclick:()=> hasNext && onChange(current + 1)
+    }, `다음 ${chunkLabel}`)
+  )
 }
 
