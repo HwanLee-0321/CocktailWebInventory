@@ -33,7 +33,7 @@ export function renderPaginatedList({
     state.pages[pageKey] = current
     container.innerHTML = ''
     if (!items.length){
-      container.appendChild(el('div',{class:'empty card'}, emptyMessage))
+      container.appendChild(el('div',{class:'empty card recommend-empty'}, emptyMessage))
       hidePager()
       return
     }

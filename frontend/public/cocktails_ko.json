@@ -10986,7 +10986,7 @@
       "strIngredient1": "초콜릿",
       "strIngredient2": "버터",
       "strIngredient3": "바닐라 추출물",
-      "strIngredient4": "반반이네요.",
+      "strIngredient4": "하프엔하프",
       "strIngredient5": "마시멜로",
       "strIngredient6": null,
       "strIngredient7": null,
@@ -11038,7 +11038,7 @@
           "categoryLabel": "기타",
           "items": [
             "바닐라 추출물",
-            "반반이네요.",
+            "하프엔하프",
             "마시멜로"
           ]
         }
@@ -13782,7 +13782,7 @@
       "strInstructions": "모든 재료를 섞되, 육두구는 제외합니다. 큰 화이트 와인 글라스에 혼합물을 부은 후 육두구를 위에 뿌립니다.",
       "strDrinkThumb": "https://www.thecocktaildb.com/images/media/drink/xwxyux1441254243.jpg",
       "strIngredient1": "보드카",
-      "strIngredient2": "반반이네요.",
+      "strIngredient2": "하프엔하프",
       "strIngredient3": "라임에이드",
       "strIngredient4": "얼음",
       "strIngredient5": "육두구",
@@ -13842,7 +13842,7 @@
           "categoryId": "other",
           "categoryLabel": "기타",
           "items": [
-            "반반이네요.",
+            "하프엔하프",
             "얼음"
           ]
         }
@@ -40572,7 +40572,7 @@
         "바닐라 추출물",
         "바카디 151",
         "바카디 리몬",
-        "반반이네요.",
+        "하프엔하프",
         "블랙커런트 코디얼",
         "사르사파릴라",
         "사워 믹스",

@@ -241,3 +241,12 @@ html[data-device-mode="mobile"] .nav .btn.tiny{
 html[data-device-mode="mobile"] .brand{
   font-size:17px;
 }
+
+.recommend-empty {
+  padding: 40px;
+  font-size: 1.2em;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

@@ -48,7 +48,7 @@ function showPrompt(viewKey){
   promptEl.textContent = msg
   promptEl.hidden = false
   clearTimeout(promptTimeout)
-  promptTimeout = setTimeout(()=> hidePrompt(), 6000)
+  promptTimeout = setTimeout(()=> hidePrompt(), 3000)
   scrolledOnce = false
 }
 
