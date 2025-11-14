@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>칵테일 레시피 추천</title>
+    <title>칵테일#</title>
     <meta name="description" content="재료와 취향을 바탕으로 칵테일 레시피를 추천합니다." />
     <link rel="icon" href="/favicon.png" />
     <link rel="preconnect" href="https://images.unsplash.com" crossorigin />
@@ -13,7 +13,11 @@
   <body>
     <nav class="nav">
       <div class="nav__inner">
-        <div class="brand">Cocktail Lab</div>
+        <div class="brand brand--dual">
+          <span class="brand__ko">칵테일#</span>
+          <span class="brand__divider">|</span>
+          <span class="brand__en">Cocktail#</span>
+        </div>
         <div class="nav__links">
           <a href="#/recommend" class="link" data-link>추천</a>
           <a href="#/cocktails" class="link" data-link>전체 칵테일 목록</a>
@@ -36,7 +40,7 @@
       <section id="view-recommend" data-view hidden>
         <header class="hero hero--simple container">
           <div class="hero__content">
-            <h1>칵테일 레시피 추천</h1>
+            <h1><span class="brand-pill brand-pill--ko">칵테일#</span> 레시피 추천</h1>
             <p class="muted">검색으로 시작하고 필요한 필터만 골라 간결하게 추천을 받아보세요.</p>
             <div class="row">
               <input id="searchInput" class="input input--lg" type="text" placeholder="칵테일 이름, 재료, 키워드 검색" />
@@ -101,7 +105,7 @@
       <!-- 칵테일 목록 뷰 -->
       <section id="view-cocktails" data-view hidden>
         <div class="container">
-          <h2>전체 칵테일 목록</h2>
+          <h2><span class="brand-pill brand-pill--en">Cocktail#</span> 전체 칵테일 목록</h2>
           <div class="row">
             <input id="listSearch" class="input" type="text" placeholder="이름/재료/키워드" />
           </div>
